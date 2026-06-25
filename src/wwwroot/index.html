@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AikaPanel — Editor do Servidor</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="login-wrap">
+  <div class="login-box">
+    <h1>AikaPanel</h1>
+    <p class="muted">Editor de dados do servidor Aika</p>
+    <input type="password" id="senha" placeholder="Senha de administrador" autocomplete="current-password" />
+    <button id="btnLogin">Entrar</button>
+    <div id="loginErro" class="erro"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header>
+    <strong>AikaPanel</strong>
+    <nav>
+      <button class="tab ativo" data-tab="cash">Cash Shop</button>
+      <button class="tab" data-tab="quests">Quests</button>
+    </nav>
+    <button id="btnSair" class="ghost">Sair</button>
+  </header>
+
+  <!-- CASH -->
+  <section id="tab-cash" class="tab-pane">
+    <div class="toolbar">
+      <input id="busca" placeholder="Buscar por nome, #slot, índice ou ItemIndex..." />
+      <label class="chk"><input type="checkbox" id="soVisiveis" /> Só visíveis (show=1)</label>
+      <button id="btnBuscar">Buscar</button>
+      <span id="cashStats" class="stats"></span>
+    </div>
+    <div id="cashMsg" class="msg"></div>
+    <div class="tabela-wrap">
+      <table id="tblCash">
+        <thead><tr>
+          <th>#Slot</th><th>Índice</th><th>Nome</th><th>show</th>
+          <th>Preço (cash)</th><th>ItemIndex</th><th>Qtd</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <button id="cashPrev">&laquo; Anterior</button>
+      <span id="cashPag"></span>
+      <button id="cashNext">Próxima &raquo;</button>
+    </div>
+  </section>
+
+  <!-- QUESTS -->
+  <section id="tab-quests" class="tab-pane hidden">
+    <div class="toolbar">
+      <button id="btnAddQuest">+ Nova linha</button>
+      <button id="btnSalvarQuests" class="primary">Salvar Quests.csv</button>
+      <input id="buscaQuest" placeholder="Filtrar (npcid, questid...)" />
+      <span class="muted">Editar <code>Quests.csv</code>. Reinicie o servidor para aplicar.</span>
+    </div>
+    <div id="questMsg" class="msg"></div>
+    <div class="tabela-wrap tabela-quests">
+      <table id="tblQuests"><thead><tr></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+</div>
+
+<!-- MODAL EDIT CASH -->
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <h2>Editar item do Cash Shop</h2>
+    <div class="campo"><label>#Slot</label><input id="mSlot" disabled /></div>
+    <div class="campo"><label>Índice (somente leitura)</label><input id="mIndice" disabled /></div>
+    <div class="campo"><label>Nome (máx 64)</label><input id="mNome" maxlength="64" /></div>
+    <div class="campo"><label>Descrição (máx 256)</label><textarea id="mDesc" maxlength="256" rows="3"></textarea></div>
+    <div class="campo-linha">
+      <div class="campo"><label>Visível (show)</label>
+        <select id="mShow"><option value="1">1 — visível</option><option value="0">0 — oculto</option></select>
+      </div>
+      <div class="campo"><label>Preço (cash)</label><input id="mPreco" type="number" min="0" /></div>
+    </div>
+    <div class="campo-linha">
+      <div class="campo"><label>ItemIndex</label><input id="mItemIndex" type="number" min="0" max="65535" /></div>
+      <div class="campo"><label>Quantidade</label><input id="mQtd" type="number" min="0" max="65535" /></div>
+    </div>
+    <div id="modalErro" class="erro"></div>
+    <div class="modal-acoes">
+      <button id="mCancelar" class="ghost">Cancelar</button>
+      <button id="mSalvar" class="primary">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

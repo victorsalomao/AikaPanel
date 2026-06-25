@@ -38,8 +38,10 @@ var app = builder.Build();
 // --- Simple token auth (password gate) ---
 var tokens = new ConcurrentDictionary<string, byte>();
 
-app.UseDefaultFiles();
-app.UseStaticFiles();
+var webFiles = new Microsoft.Extensions.FileProviders.ManifestEmbeddedFileProvider(
+    System.Reflection.Assembly.GetExecutingAssembly(), "wwwroot");
+app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = webFiles });
+app.UseStaticFiles(new StaticFileOptions { FileProvider = webFiles });
 
 bool Authed(HttpRequest r) =>
     r.Headers.TryGetValue("X-Auth-Token", out var t) && tokens.ContainsKey(t.ToString());
