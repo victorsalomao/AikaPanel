@@ -67,6 +67,10 @@ public static class TitleBin
 
     public static TitleData DecodeTitle(byte[] file, int titleIndex)
     {
+        if ((uint)titleIndex >= TitleCount)
+            throw new ArgumentOutOfRangeException(nameof(titleIndex), $"Indice {titleIndex} fora de 0..{TitleCount - 1}.");
+        if (file.Length < ExpectedFileSize)
+            throw new InvalidOperationException($"Title.bin tem {file.Length} bytes, esperado {ExpectedFileSize}.");
         var t = new TitleData { Index = titleIndex };
         for (int l = 0; l < LevelsPerTitle; l++)
         {
