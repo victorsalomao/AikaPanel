@@ -20,6 +20,7 @@ amigável em português:
    {
      "AikaPanel": {
        "DataDir": "C:\\Users\\user\\Downloads\\AikaMerged\\Bin\\Data",
+       "ClientUIDir": "C:\\Users\\user\\Downloads\\AnotherAikaDelphi\\AIKAClient\\UI",
        "Host": "127.0.0.1",
        "Port": 8099,
        "Password": "troque-esta-senha"
@@ -27,7 +28,10 @@ amigável em português:
    }
    ```
 
-   - `DataDir` — pasta `Data` do servidor (onde estão `PI.bin` e `Quest\Quests.csv`).
+   - `DataDir` — pasta `Data` do servidor (onde estão `PI.bin`, `ItemList.bin` e `Quest\Quests.csv`).
+   - `ClientUIDir` — pasta `UI` do **client** (onde fica o `PI.bin` CIFRADO da vitrine da loja).
+     Ao salvar a Loja de Cash, o painel grava os DOIS: o `Data\PI.bin` cru (server) e o
+     `UI\PI.bin` cifrado (client). Deixe **vazio** (`""`) para desativar o sync do client.
    - `Host` / `Port` — onde o painel escuta. `127.0.0.1` = só esta máquina.
    - `Password` — senha de administrador exigida na tela de login. **Troque sempre.**
 
@@ -66,6 +70,23 @@ re-serializa e confere byte a byte. Deve imprimir `ROUND-TRIP OK 6000/6000`.
   byte a byte** — só os campos que você muda são reescritos.
 - **Prova de exatidão:** ler todos os 6000 registros e regravá-los sem alteração produz um
   arquivo idêntico ao original (`--selftest` → `ROUND-TRIP OK 6000/6000`).
+
+#### Vitrine do client (`UI\PI.bin` cifrado) — sincronização automática
+- O servidor lê o `Data\PI.bin` **cru**; o **client** lê a vitrine de `UI\PI.bin`, que é o
+  **mesmo catálogo, porém CIFRADO** (Key1 do MasterEditor). Por isso editar só o `Data\PI.bin`
+  **não fazia o item aparecer na loja** — faltava atualizar a versão cifrada do client.
+- Agora, ao salvar a Loja de Cash, o painel grava os **dois**: `Data\PI.bin` (cru) **e**
+  `UI\PI.bin` (cifrado), gerado dos mesmos bytes. Faz **backup do arquivo do client** antes.
+- A cifra replica **exatamente** `TFunctions.SaveEncriptedFileKey1` (MasterEditor `Functions.pas`):
+  `enc[j] = (raw[j] + cipher[j mod 102] + j) mod 256`, com a tabela Key1 (102 bytes). Provado
+  byte-a-byte: `encrypt(decrypt(UI\PI.bin)) == UI\PI.bin` → **2.256.004/2.256.004 idêntico**, e
+  `decrypt(UI\PI.bin)` produz texto legível (nomes em PT) igual ao `Data\PI.bin`.
+- **Indicador de sync** no topo da aba Cash Shop: verde `✓ server ↔ client sincronizados` quando
+  `encrypt(Data\PI.bin) == UI\PI.bin`; vermelho quando divergem. Botão **Sincronizar vitrine do
+  client** força a regravação do `UI\PI.bin` a partir do `Data\PI.bin` atual (útil na 1ª vez,
+  já que os snapshots costumam estar defasados).
+- Verificação por linha de comando: `AikaPanel.exe --cryptotest <Data\PI.bin> <UI\PI.bin>`
+  (compara encrypt/decrypt byte-a-byte). Também há `--encrypt`/`--decrypt <in> <out>`.
 
 ### Itens (`ItemList.bin`)
 - Cada item é um registro **packed** de **464 bytes** (`TItemFromList` em

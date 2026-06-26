@@ -13,6 +13,7 @@ if (File.Exists(cfgPath))
         if (ap.TryGetProperty("Host", out var h)) cfg.Host = h.GetString() ?? cfg.Host;
         if (ap.TryGetProperty("Port", out var p)) cfg.Port = p.GetInt32();
         if (ap.TryGetProperty("Password", out var pw)) cfg.Password = pw.GetString() ?? cfg.Password;
+        if (ap.TryGetProperty("ClientUIDir", out var cu)) cfg.ClientUIDir = cu.GetString() ?? cfg.ClientUIDir;
     }
 }
 
@@ -37,6 +38,35 @@ if (args.Contains("--selftest"))
         return rc;
     }
     catch (Exception ex) { Console.WriteLine("SELFTEST ERROR: " + ex.Message); return 2; }
+}
+
+// --- Crypto proof: encrypt(raw)==enc?  decrypt(enc)==raw?  ---
+if (args.Length >= 3 && args[0] == "--cryptotest")
+{
+    var raw = File.ReadAllBytes(args[1]);
+    var enc = File.ReadAllBytes(args[2]);
+    int Compare(byte[] a, byte[] b, out int firstDiff)
+    {
+        firstDiff = -1; int match = 0; int n = Math.Min(a.Length, b.Length);
+        for (int i = 0; i < n; i++) { if (a[i] == b[i]) match++; else if (firstDiff < 0) firstDiff = i; }
+        return match;
+    }
+    var encOut = CashCrypto.Encrypt(raw);
+    int m1 = Compare(encOut, enc, out int d1);
+    Console.WriteLine($"encrypt(raw) vs enc : {m1}/{enc.Length} iguais" + (m1 == enc.Length && raw.Length == enc.Length ? "  -> BYTE-IDENTICO" : $"  (1a diff @ {d1})"));
+    var decOut = CashCrypto.Decrypt(enc);
+    int m2 = Compare(decOut, raw, out int d2);
+    Console.WriteLine($"decrypt(enc) vs raw : {m2}/{raw.Length} iguais" + (m2 == raw.Length && raw.Length == enc.Length ? "  -> BYTE-IDENTICO" : $"  (1a diff @ {d2})"));
+    return (m1 == enc.Length && m2 == raw.Length && raw.Length == enc.Length) ? 0 : 1;
+}
+
+if (args.Length >= 3 && (args[0] == "--encrypt" || args[0] == "--decrypt"))
+{
+    var inp = File.ReadAllBytes(args[1]);
+    var outb = args[0] == "--encrypt" ? CashCrypto.Encrypt(inp) : CashCrypto.Decrypt(inp);
+    File.WriteAllBytes(args[2], outb);
+    Console.WriteLine($"{args[0]} {inp.Length} bytes -> {args[2]}");
+    return 0;
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -121,8 +151,11 @@ app.MapPost("/api/cash/{slot:int}", (int slot, CashEdit edit) =>
     if (edit.Show > 1) edit.Show = 1;
     try
     {
-        var bak = cash.Update(slot, edit);
-        return Results.Json(Ok(new { backup = Path.GetFileName(bak) }, "Registro salvo. Reinicie o servidor para aplicar."));
+        var r = cash.Update(slot, edit);
+        var msg = r.ClientSynced
+            ? "Salvo. Server (Data\\PI.bin) e vitrine do client (UI\\PI.bin) sincronizados. Reinicie o servidor para aplicar."
+            : $"Salvo no server. {r.ClientMessage} Reinicie o servidor para aplicar.";
+        return Results.Json(Ok(new { backup = r.ServerBackup, clientSynced = r.ClientSynced, clientBackup = r.ClientBackup, clientMsg = r.ClientMessage }, msg));
     }
     catch (Exception ex) { return Results.Json(Err("ERRO_GRAVACAO", ex.Message), statusCode: 400); }
 });
@@ -131,6 +164,24 @@ app.MapGet("/api/cash/selftest", () =>
 {
     try { var (ok, total, mm) = cash.SelfTest(); return Results.Json(Ok(new { ok, total, firstMismatch = mm })); }
     catch (Exception ex) { return Results.Json(Err("ERRO_SELFTEST", ex.Message), statusCode: 400); }
+});
+
+app.MapGet("/api/cash/syncstatus", () =>
+{
+    try { return Results.Json(Ok(cash.SyncStatus())); }
+    catch (Exception ex) { return Results.Json(Err("ERRO_SYNC", ex.Message), statusCode: 400); }
+});
+
+app.MapPost("/api/cash/sync", () =>
+{
+    if (!cash.Exists) return Results.Json(Err("ARQUIVO_NAO_ENCONTRADO", "PI.bin nao encontrado."), statusCode: 404);
+    try
+    {
+        var r = cash.SyncClient();
+        if (r.ClientSynced) return Results.Json(Ok(new { clientBackup = r.ClientBackup }, "Vitrine do client sincronizada com o Data\\PI.bin atual."));
+        return Results.Json(Err("SYNC_FALHOU", r.ClientMessage), statusCode: 400);
+    }
+    catch (Exception ex) { return Results.Json(Err("ERRO_SYNC", ex.Message), statusCode: 400); }
 });
 
 // --- Quests ---

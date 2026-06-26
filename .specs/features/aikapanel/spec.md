@@ -23,6 +23,9 @@ Edits two data files with BYTE-EXACT output the server already expects. Friendly
   Level/IconID/Classe/TypeItem/TypeTrade/prices/stats. Searchable by ID/PT/EN. Backup + round-trip self-test.
 - REQ-09 (bônus) Ícones: atlas ItemIcons01..11.jit (1024×1024, 32px cells). JIT→PNG decoder in tools/jit2png.
   IconID→cell formula NOT simple-sequential (verification failed) → IconID as number; thumbnails deferred (AIKA.exe RE).
+- REQ-10 Cash sync client: ao salvar Loja de Cash, gravar `Data\PI.bin` (cru) E `ClientUIDir\PI.bin` (cifrado Key1),
+  com backup do client. Cifra replica MasterEditor SaveEncriptedFileKey1: enc[j]=(raw[j]+cipher[j%102]+j)%256.
+  PROVA: encrypt(decrypt(UI))==UI 2256004/2256004 byte-idêntico; decrypt(UI) legível. Badge de sync + botão Sincronizar.
 
 ## Quest pipeline finding (CRITICAL — verified)
 Load.pas `InitQuests` (L863) reads `Quests.csv` DIRECTLY into `_Quests` at boot and assigns to NPCs (L1834).

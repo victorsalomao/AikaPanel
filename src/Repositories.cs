@@ -8,6 +8,28 @@ public sealed class PanelConfig
     public string Host { get; set; } = "127.0.0.1";
     public int Port { get; set; } = 8099;
     public string Password { get; set; } = "";
+    // Pasta UI do client (vitrine cifrada da Loja de Cash). Vazio = nao sincroniza.
+    public string ClientUIDir { get; set; } = "";
+}
+
+/// <summary>Resultado de um save da Loja de Cash (server cru + sync client cifrado).</summary>
+public sealed class CashSaveResult
+{
+    public string ServerBackup { get; set; } = "";
+    public bool ClientConfigured { get; set; }
+    public bool ClientSynced { get; set; }
+    public string? ClientBackup { get; set; }
+    public string ClientMessage { get; set; } = "";
+}
+
+/// <summary>Estado de sincronizacao entre Data\PI.bin (cru) e UI\PI.bin (cifrado).</summary>
+public sealed class CashSyncStatus
+{
+    public bool ClientConfigured { get; set; }
+    public string ClientPath { get; set; } = "";
+    public bool ClientExists { get; set; }
+    public bool InSync { get; set; }
+    public string Mensagem { get; set; } = "";
 }
 
 public static class Backup
@@ -25,10 +47,17 @@ public static class Backup
 public sealed class CashRepository
 {
     private readonly string _path;
+    private readonly string _clientPath; // UI\PI.bin (cifrado) ou "" se nao configurado
     private readonly object _lock = new();
-    public CashRepository(PanelConfig cfg) => _path = Path.Combine(cfg.DataDir, "PI.bin");
+    public CashRepository(PanelConfig cfg)
+    {
+        _path = Path.Combine(cfg.DataDir, "PI.bin");
+        _clientPath = string.IsNullOrWhiteSpace(cfg.ClientUIDir) ? "" : Path.Combine(cfg.ClientUIDir, "PI.bin");
+    }
 
     public string FilePath => _path;
+    public string ClientPath => _clientPath;
+    public bool ClientConfigured => _clientPath.Length > 0;
     public bool Exists => File.Exists(_path);
 
     public byte[] ReadAll()
@@ -53,8 +82,11 @@ public sealed class CashRepository
 
     public (bool ok, int total, int firstMismatch) SelfTest() => PiBin.SelfTest(ReadAll());
 
-    /// <summary>Backs up, applies edit to a single slot, writes whole file back. Returns backup path.</summary>
-    public string Update(int slot, CashEdit edit)
+    /// <summary>
+    /// Backs up + applies edit + writes Data\PI.bin (cru). Em seguida sincroniza a vitrine do
+    /// client gravando UI\PI.bin CIFRADO (Key1) a partir dos mesmos bytes. Retorna o resultado.
+    /// </summary>
+    public CashSaveResult Update(int slot, CashEdit edit)
     {
         lock (_lock)
         {
@@ -65,8 +97,58 @@ public sealed class CashRepository
             var bak = Backup.Make(_path);
             PiBin.ApplyEdit(bytes.AsSpan(slot * PiBin.RecordSize, PiBin.RecordSize), edit);
             File.WriteAllBytes(_path, bytes);
-            return bak;
+            var res = new CashSaveResult { ServerBackup = Path.GetFileName(bak), ClientConfigured = ClientConfigured };
+            SyncClientLocked(bytes, res);
+            return res;
         }
+    }
+
+    /// <summary>Grava a vitrine do client (UI\PI.bin cifrado) a partir dos bytes crus dados.</summary>
+    private void SyncClientLocked(byte[] rawBytes, CashSaveResult res)
+    {
+        if (!ClientConfigured) { res.ClientMessage = "Sync do client desativado (ClientUIDir vazio)."; return; }
+        try
+        {
+            var enc = CashCrypto.Encrypt(rawBytes);
+            var dir = Path.GetDirectoryName(_clientPath)!;
+            if (!Directory.Exists(dir)) { res.ClientMessage = $"Pasta do client nao existe: {dir}"; return; }
+            if (File.Exists(_clientPath)) res.ClientBackup = Path.GetFileName(Backup.Make(_clientPath));
+            File.WriteAllBytes(_clientPath, enc);
+            res.ClientSynced = true;
+            res.ClientMessage = "Vitrine do client (UI\\PI.bin) sincronizada.";
+        }
+        catch (Exception ex) { res.ClientMessage = "Falha ao sincronizar client: " + ex.Message; }
+    }
+
+    /// <summary>Forca a sincronizacao do client a partir do Data\PI.bin atual.</summary>
+    public CashSaveResult SyncClient()
+    {
+        lock (_lock)
+        {
+            var bytes = ReadAll();
+            var res = new CashSaveResult { ServerBackup = "", ClientConfigured = ClientConfigured };
+            SyncClientLocked(bytes, res);
+            return res;
+        }
+    }
+
+    /// <summary>Em sync quando encrypt(Data\PI.bin) == UI\PI.bin byte-a-byte.</summary>
+    public CashSyncStatus SyncStatus()
+    {
+        var st = new CashSyncStatus { ClientConfigured = ClientConfigured, ClientPath = _clientPath };
+        if (!ClientConfigured) { st.Mensagem = "Sync do client desativado (ClientUIDir vazio)."; return st; }
+        st.ClientExists = File.Exists(_clientPath);
+        if (!st.ClientExists) { st.Mensagem = "UI\\PI.bin do client nao encontrado."; return st; }
+        try
+        {
+            var enc = CashCrypto.Encrypt(ReadAll());
+            var cur = File.ReadAllBytes(_clientPath);
+            st.InSync = enc.Length == cur.Length && enc.AsSpan().SequenceEqual(cur);
+            st.Mensagem = st.InSync ? "Server PI ↔ Client PI sincronizados."
+                                    : "Dessincronizados — salve ou clique em Sincronizar.";
+        }
+        catch (Exception ex) { st.Mensagem = "Erro ao verificar sync: " + ex.Message; }
+        return st;
     }
 }
 

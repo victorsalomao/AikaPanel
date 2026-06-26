@@ -71,6 +71,28 @@ async function loadCash() {
   $("cashPag").textContent = `Página ${d.page} de ${maxPag}`;
   $("cashPrev").disabled = d.page <= 1;
   $("cashNext").disabled = !d.tem_mais;
+  loadSyncStatus();
+}
+
+async function loadSyncStatus() {
+  const badge = $("syncBadge");
+  const { body } = await api("/api/cash/syncstatus");
+  if (!body.sucesso) { badge.className = "sync-badge na"; badge.textContent = "sync indisponível"; return; }
+  const s = body.dados;
+  if (!s.clientConfigured) { badge.className = "sync-badge na"; badge.textContent = "client não configurado"; $("btnSync").disabled = true; return; }
+  $("btnSync").disabled = false;
+  if (!s.clientExists) { badge.className = "sync-badge off"; badge.textContent = "UI\\PI.bin não encontrado"; }
+  else if (s.inSync) { badge.className = "sync-badge ok"; badge.textContent = "✓ server ↔ client sincronizados"; }
+  else { badge.className = "sync-badge off"; badge.textContent = "✗ dessincronizados"; }
+  badge.title = (s.mensagem || "") + (s.clientPath ? `\n${s.clientPath}` : "");
+}
+
+async function syncClient() {
+  showMsg("cashMsg", "Sincronizando vitrine do client...", false);
+  const { body } = await api("/api/cash/sync", { method: "POST" });
+  if (body.sucesso) showMsg("cashMsg", `${body.mensagem}` + (body.dados.clientBackup ? ` Backup client: ${body.dados.clientBackup}.` : ""), false);
+  else showMsg("cashMsg", body.mensagem, true);
+  loadSyncStatus();
 }
 
 function openEdit(it) {
@@ -100,7 +122,7 @@ async function saveEdit() {
   const { body } = await api(`/api/cash/${slot}`, { method: "POST", body: JSON.stringify(payload) });
   if (body.sucesso) {
     $("modal").classList.add("hidden");
-    showMsg("cashMsg", `Salvo. Backup: ${body.dados.backup}. Reinicie o servidor para aplicar.`, false);
+    showMsg("cashMsg", `${body.mensagem} Backup server: ${body.dados.backup}.` + (body.dados.clientBackup ? ` Backup client: ${body.dados.clientBackup}.` : ""), false);
     loadCash();
   } else {
     $("modalErro").textContent = body.mensagem || "Erro ao salvar.";
@@ -226,6 +248,7 @@ $("busca").addEventListener("keydown", e => { if (e.key === "Enter") { cashPage 
 $("soVisiveis").onchange = () => { cashPage = 1; loadCash(); };
 $("cashPrev").onclick = () => { if (cashPage > 1) { cashPage--; loadCash(); } };
 $("cashNext").onclick = () => { cashPage++; loadCash(); };
+$("btnSync").onclick = syncClient;
 $("mCancelar").onclick = () => $("modal").classList.add("hidden");
 $("mSalvar").onclick = saveEdit;
 $("btnAddQuest").onclick = addQuest;

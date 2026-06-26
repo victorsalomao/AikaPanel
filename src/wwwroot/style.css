@@ -61,3 +61,10 @@ tbody tr:hover { background: #f9fafb; }
 .campo-linha .campo input { width: 100%; }
 .grupo { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px 2px; margin-bottom: 12px; }
 .grupo legend { font-size: 12px; font-weight: 700; color: #374151; padding: 0 6px; }
+
+/* SYNC BAR */
+.sync-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.sync-badge { display: inline-block; padding: 3px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; background: #e5e7eb; color: #374151; }
+.sync-badge.ok { background: #d1fae5; color: #065f46; }
+.sync-badge.off { background: #fee2e2; color: #991b1b; }
+.sync-badge.na { background: #fef3c7; color: #92400e; }
