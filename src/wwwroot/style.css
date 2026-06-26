@@ -68,3 +68,56 @@ tbody tr:hover { background: #f9fafb; }
 .sync-badge.ok { background: #d1fae5; color: #065f46; }
 .sync-badge.off { background: #fee2e2; color: #991b1b; }
 .sync-badge.na { background: #fef3c7; color: #92400e; }
+
+/* NPC editor */
+.aviso { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; font-size: 13px; }
+.ghost.danger { color: #991b1b; border-color: #fca5a5; }
+.ghost.danger:hover { background: #fee2e2; }
+
+/* Account / Character editor */
+.modal-box-xl { max-width: 1100px; width: 96%; }
+.char-cols { display: flex; gap: 16px; align-items: flex-start; }
+.char-form { flex: 1 1 0; min-width: 0; }
+.char-side { flex: 0 0 320px; }
+.paper-doll { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.doll-slot { border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px; cursor: pointer; background: #f9fafb; min-height: 44px; }
+.doll-slot:hover { border-color: #0066ff; }
+.doll-slot.filled { background: #eef5ff; border-color: #bcd4ff; }
+.doll-label { font-size: 11px; color: #6b7280; }
+.doll-item { font-size: 13px; font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doll-empty { font-size: 12px; color: #9ca3af; }
+.inv-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.inv-tab { padding: 4px 12px; border: 1px solid #e5e7eb; background: #fff; border-radius: 6px; cursor: pointer; }
+.inv-tab.ativo { background: #0066ff; color: #fff; border-color: #0066ff; }
+.inv-grid { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.inv-add { align-self: flex-start; }
+.inv-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px; cursor: pointer; background: #f9fafb; width: 150px; }
+.inv-card:hover { border-color: #0066ff; }
+.inv-slot { font-size: 11px; color: #6b7280; }
+.inv-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inv-meta { font-size: 11px; color: #9ca3af; }
+
+/* ---------- ÍCONES ---------- */
+.icon {
+  display: inline-block; width: 32px; height: 32px; vertical-align: middle;
+  background-repeat: no-repeat; image-rendering: pixelated;
+  border-radius: 4px;
+}
+.icon.empty { background: repeating-conic-gradient(#2a2f3a 0% 25%, #222632 0% 50%) 50% / 12px 12px; }
+.icon-lg { width: 48px; height: 48px; background-size: 1536px 1536px; } /* 1024*1.5 */
+td .icon { box-shadow: 0 0 0 1px rgba(0,0,0,.25) inset; }
+.icone-preview-linha { display: flex; align-items: center; gap: 10px; }
+
+.icone-browser { display: flex; gap: 18px; align-items: flex-start; }
+.icone-sheet-wrap {
+  position: relative; overflow: auto; max-height: 70vh; max-width: 1040px;
+  border: 1px solid var(--borda, #333); border-radius: 6px;
+  background: repeating-conic-gradient(#1c2029 0% 25%, #171a22 0% 50%) 50% / 24px 24px;
+}
+#iconSheet, #pickSheet { display: block; width: 1024px; height: 1024px; image-rendering: pixelated; cursor: crosshair; }
+.icone-hi {
+  position: absolute; width: 32px; height: 32px; pointer-events: none;
+  border: 2px solid #ffd34d; box-shadow: 0 0 0 1px #000, 0 0 8px #ffd34d; box-sizing: border-box;
+}
+.icone-side { flex: 1; min-width: 240px; }
+.icone-side h3 { margin: 0 0 8px; }

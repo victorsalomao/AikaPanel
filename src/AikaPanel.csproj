@@ -20,6 +20,8 @@
     <!-- Needed for Windows-1252 (code page 1252) on .NET Core -->
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.11" />
+    <!-- MySQL client for the account/character editor (caelite DB). Single clean assembly, single-file friendly. -->
+    <PackageReference Include="MySqlConnector" Version="2.3.7" />
   </ItemGroup>
 
   <ItemGroup>

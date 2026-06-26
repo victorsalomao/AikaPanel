@@ -1,171 +1,217 @@
 # AikaPanel
 
-Editor web local para o servidor Aika Online (Delphi). Edita dois arquivos de dados
-com saída **byte-exata** (idêntica à que o servidor já espera) através de uma interface
-amigável em português:
+**Painel web de administração para servidores Aika Online (emulador Delphi).**
+Edita os arquivos de dados do servidor — e os arquivos **cifrados do client** —
+com saída **byte-exata** (idêntica à que o servidor/cliente já esperam), por uma
+interface amigável em português. Tudo num único `.exe` self-contained (.NET 8).
 
-- **Cash Shop** — `Data\PI.bin` (6000 registros de 376 bytes) + vitrine cifrada do client
-- **Itens** — `Data\ItemList.bin` (31000 registros de 464 bytes) + `ItemList4.bin` cifrado do client
-- **Skills** — `Data\SkillData.bin` (12000 registros de 720 bytes) + `SkillData4.bin` cifrado do client
-- **Quests** — `Data\Quest\Quests.csv`
-
-É um único `.exe` self-contained (.NET 8, win-x64). Não precisa instalar nada no VPS.
-
----
-
-## Como rodar (local)
-
-1. Edite `appsettings.json` (fica ao lado do `.exe`):
-
-   ```json
-   {
-     "AikaPanel": {
-       "DataDir": "C:\\Users\\user\\Downloads\\AikaMerged\\Bin\\Data",
-       "ClientUIDir": "C:\\Users\\user\\Downloads\\AnotherAikaDelphi\\AIKAClient\\UI",
-       "ClientGameDir": "C:\\Users\\user\\Downloads\\AnotherAikaDelphi\\AIKAClient",
-       "Host": "127.0.0.1",
-       "Port": 8099,
-       "Password": "troque-esta-senha"
-     }
-   }
-   ```
-
-   - `DataDir` — pasta `Data` do servidor (`PI.bin`, `ItemList.bin`, `SkillData.bin`, `Quest\Quests.csv`).
-   - `ClientUIDir` — pasta `UI` do **client** (onde fica o `PI.bin` CIFRADO da vitrine da loja).
-     Ao salvar a Loja de Cash, o painel grava os DOIS: `Data\PI.bin` cru + `UI\PI.bin` cifrado.
-   - `ClientGameDir` — **raiz** do client (onde ficam `ItemList4.bin` e `SkillData4.bin` cifrados v4).
-     Ao salvar Itens/Skills, o painel grava o cru do server E o arquivo v4 cifrado do client.
-   - Deixe `ClientUIDir`/`ClientGameDir` **vazios** (`""`) para desativar o sync do client.
-   - `Host` / `Port` — onde o painel escuta. `127.0.0.1` = só esta máquina.
-   - `Password` — senha de administrador exigida na tela de login. **Troque sempre.**
-
-2. Dê um duplo-clique em `AikaPanel.exe` (ou rode pelo terminal).
-3. Abra o navegador em `http://127.0.0.1:8099`.
-4. Faça login com a senha do `appsettings.json` e edite.
-
-**Auto-teste (opcional):** `AikaPanel.exe --selftest` lê os 6000 registros do `PI.bin`,
-re-serializa e confere byte a byte. Deve imprimir `ROUND-TRIP OK 6000/6000`.
+> Por que "byte-exato"? Os formatos do Aika são `packed records` Delphi. O painel
+> lê o registro, reescreve **só os campos que você muda** e preserva todo o resto
+> byte a byte — então nunca corrompe campos desconhecidos. Cada módulo tem um
+> `--selftest` que prova isso (ler → reserializar → comparar == original).
 
 ---
 
-## Como implantar no VPS (Windows)
+## ✨ Recursos
 
-1. Copie para o VPS apenas **2 arquivos**: `AikaPanel.exe` e `appsettings.json`
-   (o `.pdb` e o `web.config` não são necessários). A interface web está embutida no exe.
-2. No `appsettings.json` do VPS:
-   - ajuste `DataDir` para a pasta `Data` do servidor lá;
-   - defina uma `Password` forte;
-   - se for acessar de fora da máquina, mude `Host` para `0.0.0.0` e **libere a porta no
-     firewall** (recomendado manter `127.0.0.1` e acessar via túnel/RDP por segurança).
-3. Rode `AikaPanel.exe` (deixe numa janela ou crie um serviço/atalho na inicialização).
-4. Abra `http://SEU_IP:8099`, faça login, edite.
-
----
-
-## Como ele edita os arquivos
-
-### Cash Shop (`PI.bin`)
-- Cada item é um registro **packed** de **376 bytes**, little-endian, strings AnsiChar
-  (Windows-1252) terminadas em nulo. O arquivo tem 6000 registros + 4 bytes finais
-  (checksum/trailer) que são **preservados intactos**.
-- Campos editáveis: **show** (1=visível/0=oculto), **Nome**, **Descrição**, **Preço (cash)**,
-  **ItemIndex** (id do item entregue), **Quantidade**.
-- Todos os outros bytes (status, trade, price_off, unk*, Amount_2, trailer) são **preservados
-  byte a byte** — só os campos que você muda são reescritos.
-- **Prova de exatidão:** ler todos os 6000 registros e regravá-los sem alteração produz um
-  arquivo idêntico ao original (`--selftest` → `ROUND-TRIP OK 6000/6000`).
-
-#### Vitrine do client (`UI\PI.bin` cifrado) — sincronização automática
-- O servidor lê o `Data\PI.bin` **cru**; o **client** lê a vitrine de `UI\PI.bin`, que é o
-  **mesmo catálogo, porém CIFRADO** (Key1 do MasterEditor). Por isso editar só o `Data\PI.bin`
-  **não fazia o item aparecer na loja** — faltava atualizar a versão cifrada do client.
-- Agora, ao salvar a Loja de Cash, o painel grava os **dois**: `Data\PI.bin` (cru) **e**
-  `UI\PI.bin` (cifrado), gerado dos mesmos bytes. Faz **backup do arquivo do client** antes.
-- A cifra replica **exatamente** `TFunctions.SaveEncriptedFileKey1` (MasterEditor `Functions.pas`):
-  `enc[j] = (raw[j] + cipher[j mod 102] + j) mod 256`, com a tabela Key1 (102 bytes). Provado
-  byte-a-byte: `encrypt(decrypt(UI\PI.bin)) == UI\PI.bin` → **2.256.004/2.256.004 idêntico**, e
-  `decrypt(UI\PI.bin)` produz texto legível (nomes em PT) igual ao `Data\PI.bin`.
-- **Indicador de sync** no topo da aba Cash Shop: verde `✓ server ↔ client sincronizados` quando
-  `encrypt(Data\PI.bin) == UI\PI.bin`; vermelho quando divergem. Botão **Sincronizar vitrine do
-  client** força a regravação do `UI\PI.bin` a partir do `Data\PI.bin` atual (útil na 1ª vez,
-  já que os snapshots costumam estar defasados).
-- Verificação por linha de comando: `AikaPanel.exe --cryptotest <Data\PI.bin> <UI\PI.bin>`
-  (compara encrypt/decrypt byte-a-byte). Também há `--encrypt`/`--decrypt <in> <out>`.
-
-### Itens (`ItemList.bin`)
-- Cada item é um registro **packed** de **464 bytes** (`TItemFromList` em
-  `Src\Data\FilesData.pas`), little-endian, strings Windows-1252. O arquivo tem 31000
-  registros + 4 bytes finais (trailer) **preservados intactos**.
-- ID = índice do registro no array (0..30999).
-- Campos editáveis: Nome (PT), Nome (EN), Descrição, ItemType, UseEffect, Level, IconID,
-  Classe, TypeItem (raridade), TypeTrade, preços (PriceGold/Honor/Medal/SellPrince,
-  TypePriceItem/Value) e atributos (ATKFis/DefFis/MagATK/DefMag/HP/MP).
-- Todo byte não editado é preservado (mesma técnica do `PI.bin`).
-- **Prova de exatidão:** `--selftest` → `ItemList.bin ROUND-TRIP OK 31000/31000`.
-- **Ícones:** o `IconID` é mostrado/editado como número. O atlas de ícones é
-  `AIKAClient\UI\ItemIcons01..11.jit` (1024×1024, células de 32×32 = 1024 ícones por atlas).
-  Existe um conversor JIT→PNG funcional em `tools\jit2png\` (uso:
-  `dotnet run -- <arquivo.jit> <saida.png> [maxSize]`). **Pendente:** a fórmula exata
-  IconID→(atlas,célula) **não** é o mapeamento sequencial simples (`atlas=IconID/1024`) —
-  a verificação falhou; a lógica de seleção do atlas está no `AIKA.exe` (sem fonte) e
-  precisa de mais engenharia reversa. Por isso o thumbnail por item **não** foi embutido.
-
-### Skills (`SkillData.bin`)
-- Registro **packed** de **720 bytes** (`T_SkillData` em `Src\Data\FilesData.pas`), 12000 registros + 4
-  de trailer. ID = índice no array. Win-1252; Nome(PT)@84, Nome(EN)@20, Descrição@428.
-- Editáveis: Nome PT/EN, Descrição, Level, MinLevel, Classe, Classification, SkillPoints, LearnCosts,
-  MP, Damage, Range, SuccessRate, MaxTargets, Cooldown, CastTime, Duration, TargetType.
-- **Prova:** `--selftest` → `SkillData.bin ROUND-TRIP OK 12000/12000`.
-
-### Sincronização do client v4 (`ItemList4.bin` / `SkillData4.bin`)
-- O **server** lê o cru (`Data\ItemList.bin`, `Data\SkillData.bin`); o **client** lê versões CIFRADAS
-  (`ItemList4.bin`, `SkillData4.bin` na raiz do client). Editar só o cru não muda o que o client mostra.
-- **Esquema v4 (engenharia reversa, provado byte-a-byte):** cada arquivo do client =
-  **header de 12 bytes em texto** (`"BR00022I"` no ItemList, `"BR00010S"` no SkillData) **+** corpo
-  cifrado com a cifra posicional do MasterEditor, mas com o `j` **reiniciando em 0 no início do corpo**
-  (após o header). ItemList usa **Key1**, SkillData usa **Key2**.
-  - `enc[j] = (raw[j] + tabela[j mod len] + j) mod 256` sobre o corpo (cru = arquivo inteiro do server).
-  - Prova: `encrypt(decrypt(corpo)) == corpo` byte-idêntico nos dois; e `decrypt(SkillData4) == Data\SkillData.bin`
-    100% (zero drift). Nomes decifrados legíveis ("Pedra da Pran", "Ataque Poderoso", "Revitalizar").
-- Ao salvar um Item/Skill, o painel grava o cru do server E reescreve o arquivo v4 do client =
-  **header existente preservado + Encrypt(cru do server)** (backup do arquivo do client antes).
-- **Badge de sync** em cada aba + botão **Sincronizar client**. O ItemList do client costuma começar
-  defasado (snapshot mais antigo) → badge vermelho até o 1º sync; depois fica verde. O SkillData já
-  vinha idêntico ao server (verde de cara).
-- **Atenção:** sincronizar **sobrescreve o catálogo do client com o do server** (o client passa a
-  espelhar o server). Itens ficam no mesmo índice — é atualização de valores, não embaralha.
-- CLI de RE/prova: `tools\v4crack` (decifra um arquivo v4, mostra o Name de um registro e prova o
-  round-trip): `dotnet run -- <ItemList4.bin> key1 12 464 100 0 64 [Data\ItemList.bin]`.
-
-### Quests (`Quests.csv`)
-- O servidor lê `Data\Quest\Quests.csv` **diretamente no boot** (`InitQuests` em `Load.pas`)
-  e atribui as quests aos NPCs. **Não há compilação CSV→Quest.bin** — editar o CSV funciona.
-- Arquivo sem cabeçalho, 34 colunas por linha (nomes derivados do código do servidor).
-- O `Quest.bin` é uma estrutura **separada** e **não é tocada** por este painel.
-
-### Segurança (sempre)
-- Antes de **qualquer** gravação, é criada uma cópia com data/hora:
-  `PI.bin.AAAAMMDD-hhmmss.bak` / `ItemList.bin.AAAAMMDD-hhmmss.bak` /
-  `Quests.csv.AAAAMMDD-hhmmss.bak` na mesma pasta.
-- `PI.bin` e `ItemList.bin` são validados (tamanho múltiplo do registro, +4 de trailer); recusa se inválido.
-- Nunca grava registro parcial.
+| Aba | Arquivo(s) | O que faz |
+|---|---|---|
+| **Cash Shop** | `Data\PI.bin` + `UI\PI.bin` (cifrado) | Edita a loja de cash (nome, preço, item entregue, qtd, visível) e **sincroniza a vitrine cifrada do client** |
+| **Itens** | `Data\ItemList.bin` + `ItemList4.bin` (cifrado) | Editor dos 31000 itens (nome PT/EN, tipo, level, preços, atributos, IconID) + sync do client v4 |
+| **Skills** | `Data\SkillData.bin` + `SkillData4.bin` (cifrado) | Editor das skills (dano, MP, cooldown, alcance, custo…) + sync do client v4 |
+| **NPCs** | `Data\NPCs\*.npc` | Edita loja, posição e título do NPC; clona/cria NPC; mostra o **nome in-game** e sinaliza NPCs duplicados |
+| **Contas** | MySQL `caelite` | Cria/edita contas e personagens (itens, stats, gold, nação…) direto no banco |
+| **Itens Evento (T)** | `Data\ItemList.bin` + DB | Marca itens como "evento" (tecla T) e entrega para jogadores |
+| **Quests** | `Data\Quest\Quests.csv` | Edita as quests lidas pelo servidor no boot |
+| **Ícones** | `UI\ItemIcons*.jit` | Navegador de ícones do client (atlas JIT → sprites) |
 
 ---
 
-## ⚠️ Reinicie o servidor para aplicar
+## 📋 Pré-requisitos
 
-Tanto o `PI.bin` quanto o `Quests.csv` são carregados **na inicialização** do servidor Aika.
-Depois de salvar no painel, **reinicie o servidor** (ou recarregue os dados) para as
-mudanças entrarem em efeito. Os jogadores online só veem o novo Cash Shop / novas quests
-após esse restart.
+- **Windows x64** (o exe é `win-x64` self-contained — não precisa instalar .NET pra rodar).
+- Para **compilar**: [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+- Os **arquivos de dados** do seu servidor Aika (a pasta `Bin\Data`).
+- Para a aba **Contas**: um **MySQL** com o banco do servidor (`caelite` por padrão).
+- (Opcional) a pasta do **client** Aika, para o painel sincronizar os arquivos cifrados
+  (Cash Shop / Itens / Skills) que o client lê.
 
 ---
 
-## Build (para regenerar o exe)
+## ⚙️ Configuração
+
+O painel lê um `appsettings.json` ao lado do `.exe`:
+
+```json
+{
+  "AikaPanel": {
+    "DataDir": "C:\\caminho\\para\\AikaServer\\Bin\\Data",
+    "ClientUIDir": "C:\\caminho\\para\\Client\\UI",
+    "ClientGameDir": "C:\\caminho\\para\\Client",
+    "Host": "127.0.0.1",
+    "Port": 8099,
+    "Password": "troque-esta-senha",
+    "Mysql": {
+      "Server": "localhost",
+      "Port": 3306,
+      "Database": "caelite",
+      "User": "root",
+      "Password": "sua-senha-do-mysql"
+    }
+  }
+}
+```
+
+| Campo | Descrição |
+|---|---|
+| `DataDir` | Pasta `Data` do **servidor** (`PI.bin`, `ItemList.bin`, `SkillData.bin`, `NPCs\`, `Quest\Quests.csv`). **Obrigatório.** |
+| `ClientUIDir` | Pasta `UI` do **client** (vitrine cifrada `UI\PI.bin` + atlas de ícones). Vazio (`""`) desativa o sync. |
+| `ClientGameDir` | **Raiz** do client (`ItemList4.bin`, `SkillData4.bin` cifrados v4). Vazio (`""`) desativa o sync. |
+| `Host` / `Port` | Onde o painel escuta. `127.0.0.1` = só esta máquina (recomendado). |
+| `Password` | Senha de login do painel. **Troque sempre.** |
+| `Mysql` | Conexão da aba **Contas**. **Opcional** — se omitido, o painel tenta ler a seção `[MySQL]` do `Bin\AikaServer.ini` (ao lado de `Data`) automaticamente. |
+
+> 🔒 **Segurança:** o `appsettings.json` contém senhas — ele **não vai pro repositório**
+> (está no `.gitignore` na pasta `publish/`). O `src/appsettings.json` versionado é só um
+> modelo sem credenciais reais.
+
+---
+
+## ▶️ Como rodar (local)
+
+1. Edite o `appsettings.json` (no mínimo `DataDir` e `Password`).
+2. Dê duplo-clique em `AikaPanel.exe` (ou rode pelo terminal).
+3. Abra `http://127.0.0.1:8099`, faça login com a `Password` e edite.
+
+**Auto-teste (recomendado antes de confiar na UI):**
+
+```bash
+AikaPanel.exe --selftest
+```
+
+Lê todos os registros de `PI.bin`, `ItemList.bin`, `SkillData.bin`, `Title.bin` e os
+`*.npc`, reserializa e compara byte a byte. Deve imprimir `ROUND-TRIP OK` em cada um.
+
+---
+
+## 🔨 Build (gerar o exe)
 
 ```bash
 cd src
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ../publish
 ```
 
-Saída em `publish/AikaPanel.exe`.
+Saída: `publish/AikaPanel.exe` (a interface web fica **embutida** no exe). Para
+implantar, copie só **`AikaPanel.exe` + `appsettings.json`**.
+
+> A interface é embutida como recurso (`EmbeddedResource wwwroot\**`); por isso
+> qualquer mudança no front-end (`wwwroot/`) só chega ao usuário após um novo
+> `dotnet publish`.
+
+---
+
+## ☁️ Deploy no VPS (Windows)
+
+1. Copie `AikaPanel.exe` + `appsettings.json` para o VPS.
+2. Ajuste `DataDir` (e `Mysql`, se for usar Contas) e ponha uma `Password` forte.
+3. Para acesso externo, mude `Host` para `0.0.0.0` e **libere a porta no firewall**
+   — ou, mais seguro, mantenha `127.0.0.1` e acesse por túnel SSH/RDP.
+4. Rode o exe (numa janela ou como tarefa de inicialização).
+
+---
+
+## 🧩 Como cada módulo funciona
+
+### Cash Shop (`PI.bin`)
+- Registro **packed** de **376 bytes**, little-endian, strings Windows-1252. O arquivo tem
+  6000 registros + 4 bytes de trailer (preservados). Campos editáveis: `show`, Nome, Descrição,
+  Preço (cash), `ItemIndex` (item entregue), Quantidade. Todo o resto é preservado byte a byte.
+- **Vitrine do client (`UI\PI.bin` cifrado):** o servidor lê o `Data\PI.bin` cru; o client lê
+  `UI\PI.bin`, que é o **mesmo catálogo cifrado** (Key1). Por isso editar só o cru não fazia o
+  item aparecer na loja. Ao salvar, o painel grava **os dois** (com backup do arquivo do client).
+  A cifra replica `enc[j] = (raw[j] + Key1[j mod 102] + j) mod 256` — provada byte-idêntica
+  (2.256.004/2.256.004). Badge de sync + botão **Sincronizar vitrine**.
+- CLI: `AikaPanel.exe --cryptotest <Data\PI.bin> <UI\PI.bin>` · `--encrypt/--decrypt <in> <out>`.
+
+### Itens (`ItemList.bin`)
+- Registro **packed** de **464 bytes**, 31000 registros + trailer. ID = índice no array.
+  Editáveis: Nome PT/EN, Descrição, ItemType, UseEffect, Level, IconID, Classe, raridade,
+  tipo de troca, preços (Gold/Honor/Medal/SellPrince) e atributos (ATK/DEF Fís/Mag, HP, MP).
+- **Sync do client v4 (`ItemList4.bin`):** header de 12 bytes em texto (`BR00022I`) + corpo
+  cifrado (Key1, com `j` reiniciando no início do corpo). Ao salvar, grava o cru do server **e**
+  reescreve o v4 do client. Badge de sync + botão. Provado byte-a-byte.
+
+### Skills (`SkillData.bin`)
+- Registro **packed** de **720 bytes**, 12000 registros + trailer. Editáveis: Nome PT/EN,
+  Descrição, Level, Classe, SkillPoints, MP, Dano, Alcance, Taxa de sucesso, Cooldown,
+  Cast time, Duração, etc. Sync do client `SkillData4.bin` (header `BR00010S` + corpo Key2).
+
+### NPCs (`Data\NPCs\*.npc`)
+- Cada `.npc` é um `TNPCFile` (`TNPCHeader` 558B + `TBasicNpc`), 5639 bytes. Offsets validados:
+  Título @0, **Options[] (menu) @36**, Index @558, Equip @902, **loja (Inventory) @1226**,
+  posição (X/Y Single) @4807/@4811, **name-id (nome in-game) @574**.
+- Edita **loja** (itens que o NPC vende — só slots 0–39 aparecem no jogo), **posição** e
+  **título**; **clona/cria** NPC; avisa quando a posição é fixada no código (`NPC.pas`).
+- **Nome in-game vs nome do arquivo:** o nome que o jogador vê vem do **name-id** (resolvido
+  pelo client), **não** do nome do arquivo. NPCs diferentes com o mesmo name-id aparecem
+  idênticos no jogo — um pode ter a loja, o outro ser um "vazio". O painel mostra o name-id,
+  marca duplicados e, ao abrir um vazio, **aponta o gêmeo que tem a loja** ("a loja in-game é
+  a do NPC X").
+
+### Contas (MySQL `caelite`)
+- Cria/edita **contas** (usuário, senha MD5, e-mail, nação, tipo, cash) e **personagens**
+  (nome, level, stats, gold, aparência, itens nos slots de equipamento/inventário/armazém).
+- ⚠️ **Edite personagens com o char OFFLINE** — o servidor mantém o char logado em memória e
+  sobrescreve o banco ao deslogar. Toda alteração faz snapshot em `Bin\panel_backups\*.json`.
+
+### Itens de Evento (tecla T)
+- Marca itens com `slot_type` de evento (acessível pela tecla **T** no client) e os entrega
+  a jogadores. Integra com os comandos GM `/addeventitem[all]` do servidor.
+
+### Quests (`Quests.csv`)
+- O servidor lê `Data\Quest\Quests.csv` **direto no boot** (`InitQuests`) — não há compilação
+  CSV→`Quest.bin`. Arquivo sem cabeçalho, 34 colunas por linha.
+
+### Ícones (`UI\ItemIcons*.jit`)
+- Navegador dos atlas de ícones do client (`ItemIcons01..11.jit`, 1024×1024, células 32×32).
+  Há um conversor JIT→PNG em `tools/jit2png/`. *Obs.:* a fórmula exata `IconID → (atlas, célula)`
+  ainda exige engenharia reversa do `AIKA.exe`, então o thumbnail por item não é embutido.
+
+---
+
+## 🛡️ Segurança e backups
+
+- Antes de **qualquer** gravação, é criada uma cópia `*.AAAAMMDD-hhmmss.bak` na mesma pasta.
+- `PI.bin` / `ItemList.bin` / `SkillData.bin` são validados (tamanho múltiplo do registro +
+  trailer) e **nunca** gravam registro parcial.
+- O acesso ao painel exige senha (token de sessão); deixe-o em `127.0.0.1` sempre que possível.
+
+## 🔁 Reinicie o servidor para aplicar
+
+Os dados (`PI.bin`, `ItemList.bin`, `SkillData.bin`, `NPCs`, `Quests.csv`) são carregados na
+**inicialização** do servidor. Após salvar, **reinicie o servidor** (NPCs só recarregam com
+restart completo; itens/skills/etc. têm comandos `reload*` no console do servidor).
+
+---
+
+## 🗂️ Estrutura do projeto
+
+```
+AikaPanel/
+├── src/                     # código C# (.NET 8, ASP.NET minimal API)
+│   ├── Program.cs           # entrypoint: auth, rotas, CLI (--selftest/--cryptotest/...)
+│   ├── *Service.cs / *Repository.cs   # leitura/escrita byte-exata de cada formato
+│   ├── CashCrypto.cs / V4Cipher.cs    # cifras do client (Key1/Key2, v4)
+│   ├── Db.cs / AccountService.cs      # MySQL (aba Contas)
+│   └── wwwroot/             # interface web (embutida no exe no publish)
+├── tools/                   # utilitários de RE (jit2png, v4crack, memscan…)
+└── publish/                 # saída do build (gitignored — contém appsettings com segredos)
+```
+
+---
+
+## ⚠️ Aviso
+
+Ferramenta **não-oficial**, feita por engenharia reversa dos formatos do Aika, para uso em
+servidores próprios/privados. Não afiliada à Gala/Aika. Faça backup dos seus dados (o painel
+já cria `.bak`, mas tenha os seus). Use por sua conta e risco.

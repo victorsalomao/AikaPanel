@@ -9,7 +9,9 @@ int w = BitConverter.ToInt32(d, 4), h = BitConverter.ToInt32(d, 8);
 bool dxt5 = magic == "JT35";
 bool dxt1 = magic == "JT31";
 Console.WriteLine($"{magic} {w}x{h}");
+bool keepAlpha = Environment.GetEnvironmentVariable("ALPHA") == "1";
 var rgb = new byte[w * h * 3];
+var alpha = keepAlpha ? new byte[w * h] : null;
 int p = 12;
 for (int by = 0; by < h; by += 4)
 for (int bx = 0; bx < w; bx += 4)
@@ -47,11 +49,25 @@ for (int bx = 0; bx < w; bx += 4)
         int px = bx + (i % 4), py = by + (i / 4);
         if (px >= w || py >= h) continue;
         var c = col[(int)((cidx >> (2*i)) & 3)];
-        // composite alpha over white so transparent cells read as white background
         int al = a[i];
-        int rr = (c.r*al + 255*(255-al))/255, gg=(c.g*al+255*(255-al))/255, bb=(c.b*al+255*(255-al))/255;
-        int o = (py*w+px)*3; rgb[o]=(byte)rr; rgb[o+1]=(byte)gg; rgb[o+2]=(byte)bb;
+        int o = (py*w+px)*3;
+        if (keepAlpha) { rgb[o]=(byte)c.r; rgb[o+1]=(byte)c.g; rgb[o+2]=(byte)c.b; alpha[py*w+px]=(byte)al; }
+        else {
+          // composite alpha over white so transparent cells read as white background
+          int rr = (c.r*al + 255*(255-al))/255, gg=(c.g*al+255*(255-al))/255, bb=(c.b*al+255*(255-al))/255;
+          rgb[o]=(byte)rr; rgb[o+1]=(byte)gg; rgb[o+2]=(byte)bb;
+        }
     }
+}
+// optional raw RGB dump: env RAW=1 writes w*h*3 bytes (for external slicing/analysis)
+if (Environment.GetEnvironmentVariable("RAW") == "1") {
+  File.WriteAllBytes(outp, rgb);
+  Console.WriteLine($"wrote raw {outp} {w}x{h} ({rgb.Length} bytes)"); return;
+}
+// transparent RGBA output (full-res): env ALPHA=1
+if (keepAlpha) {
+  WritePngRGBA(outp, w, h, rgb, alpha);
+  Console.WriteLine($"wrote rgba {outp} {w}x{h}"); return;
 }
 // optional crop: env CROP=x,y,w,h (full-res)
 var cropEnv = Environment.GetEnvironmentVariable("CROP");
@@ -82,6 +98,19 @@ static void WritePng(string path, int w, int h, byte[] rgb)
     for(int y=0;y<h;y++){ raw[y*(w*3+1)]=0; Array.Copy(rgb,y*w*3,raw,y*(w*3+1)+1,w*3); }
     var comp = ZlibCompress(raw);
     Chunk(fs,"IDAT",comp);
+    Chunk(fs,"IEND",Array.Empty<byte>());
+}
+static void WritePngRGBA(string path, int w, int h, byte[] rgb, byte[] a)
+{
+    using var fs = File.Create(path);
+    Span<byte> sig = stackalloc byte[]{137,80,78,71,13,10,26,10}; fs.Write(sig);
+    var ihdr = new byte[13];
+    WBE(ihdr,0,w); WBE(ihdr,4,h); ihdr[8]=8; ihdr[9]=6; // 8-bit RGBA
+    Chunk(fs,"IHDR",ihdr);
+    var raw = new byte[h*(w*4+1)];
+    for(int y=0;y<h;y++){ int ro=y*(w*4+1); raw[ro]=0;
+        for(int x=0;x<w;x++){ int so=(y*w+x)*3, o=ro+1+x*4; raw[o]=rgb[so]; raw[o+1]=rgb[so+1]; raw[o+2]=rgb[so+2]; raw[o+3]=a[y*w+x]; } }
+    Chunk(fs,"IDAT",ZlibCompress(raw));
     Chunk(fs,"IEND",Array.Empty<byte>());
 }
 static void WBE(byte[]b,int o,int v){b[o]=(byte)(v>>24);b[o+1]=(byte)(v>>16);b[o+2]=(byte)(v>>8);b[o+3]=(byte)v;}
