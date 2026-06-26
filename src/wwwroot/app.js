@@ -54,6 +54,8 @@ function setTab(name) {
   if (name === "quests" && questRows.length === 0) loadQuests();
   $("tab-icones").classList.toggle("hidden", name !== "icones");
   if (name === "icones") { if (!iconsLoaded) iconsLoaded = true; initIconBrowser(); }
+  $("tab-titulos").classList.toggle("hidden", name !== "titulos");
+  if (name === "titulos" && !titlesTabLoaded) { titlesTabLoaded = true; loadTitlesTab(); }
 }
 
 /* ---------- CASH ---------- */
@@ -912,6 +914,117 @@ async function saveCharItem() {
   await loadCharItems(id);
 }
 
+/* ---------- TÍTULOS (Title.bin) ---------- */
+let titlesTabLoaded = false;
+let titleEditIndex = null;
+
+async function loadTitlesTab() {
+  await ensureTitleDefs();
+  // badge de round-trip
+  const st = await api("/api/titles/selftest");
+  if (st.body.sucesso) {
+    const d = st.body.dados;
+    $("tituloSelftest").textContent = d.ok ? `round-trip OK (${d.total})` : `FALHA no registro ${d.firstMismatch}`;
+  }
+  renderTitlesTable();
+}
+
+function renderTitlesTable() {
+  const q = ($("buscaTitulo").value || "").trim().toLowerCase();
+  const tb = $("tblTitulos").querySelector("tbody");
+  tb.innerHTML = "";
+  const rows = ALL_TITLES ? [...ALL_TITLES.values()].sort((a, b) => a.index - b.index) : [];
+  let shown = 0;
+  for (const t of rows) {
+    if (t.index === 0 && !t.name) continue;
+    if (q && !(t.name.toLowerCase().includes(q) || String(t.index) === q)) continue;
+    shown++;
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${t.index}</td>` +
+      `<td>${esc(t.name || "(vazio)")}</td>` +
+      `<td>${t.levels[0] ? t.levels[0].category : ""}</td>` +
+      `<td class="muted">${esc(attrResumo(t, 1))}</td>` +
+      `<td><button type="button" class="ghost t-edit">editar</button></td>`;
+    tr.querySelector(".t-edit").onclick = () => openTitleEdit(t.index);
+    tb.appendChild(tr);
+  }
+  if (!shown) tb.innerHTML = '<tr><td colspan="5" class="muted">Nenhum título.</td></tr>';
+}
+
+// <select> de atributo (EF) com todos os nomes; `selected` = código atual.
+function efSelectHtml(selected) {
+  const codes = EF_NAMES ? Object.keys(EF_NAMES).map(Number).sort((a, b) => a - b) : [0];
+  let html = "";
+  for (const c of codes) html += `<option value="${c}"${c === selected ? " selected" : ""}>${esc(EF_NAMES[c])} (${c})</option>`;
+  return html;
+}
+
+function openTitleEdit(index) {
+  const t = ALL_TITLES.get(index);
+  if (!t) return;
+  titleEditIndex = index;
+  $("tTitulo").textContent = `#${index} — ${t.name || "(vazio)"}`;
+  const cont = $("tLevels");
+  cont.innerHTML = "";
+  for (let l = 0; l < 4; l++) {
+    const lv = t.levels[l];
+    const box = document.createElement("fieldset");
+    box.className = "grupo";
+    box.style.flex = "1";
+    box.innerHTML =
+      `<legend>Nível ${l + 1}</legend>` +
+      `<div class="campo"><label>Nome</label><input class="tl-name" maxlength="31" value="${esc(lv.name)}" /></div>` +
+      `<div class="campo-linha">` +
+        `<div class="campo"><label>Tipo</label><input class="tl-type" type="number" min="0" max="255" value="${lv.type}" /></div>` +
+        `<div class="campo"><label>Goal</label><input class="tl-goal" type="number" min="0" value="${lv.goal}" /></div>` +
+        `<div class="campo"><label>Categoria</label><input class="tl-cat" type="number" min="0" max="255" value="${lv.category}" /></div>` +
+      `</div>` +
+      `<div class="campo-linha">` +
+        `<div class="campo"><label>Oculto</label><select class="tl-hide"><option value="0"${lv.hide === 0 ? " selected" : ""}>não</option><option value="1"${lv.hide !== 0 ? " selected" : ""}>sim</option></select></div>` +
+        `<div class="campo"><label>Cor (u32)</label><input class="tl-color" type="number" min="0" value="${lv.color}" /></div>` +
+      `</div>` +
+      [0, 1, 2].map(i =>
+        `<div class="campo-linha">` +
+          `<div class="campo" style="flex:2"><label>Atributo ${i + 1}</label><select class="tl-ef" data-i="${i}">${efSelectHtml(lv.ef[i])}</select></div>` +
+          `<div class="campo"><label>Valor</label><input class="tl-efv" data-i="${i}" type="number" min="0" value="${lv.efv[i]}" /></div>` +
+        `</div>`).join("");
+    box.dataset.idx = lv.idx; // preserva TitleIndex gravado no registro
+    cont.appendChild(box);
+  }
+  $("modalTitleErro").textContent = "";
+  $("modalTitle").classList.remove("hidden");
+}
+
+async function saveTitleEdit() {
+  if (titleEditIndex == null) return;
+  $("modalTitleErro").textContent = "";
+  const boxes = $("tLevels").querySelectorAll("fieldset");
+  const levels = [];
+  boxes.forEach((box, l) => {
+    const ef = [0, 0, 0], efv = [0, 0, 0];
+    box.querySelectorAll(".tl-ef").forEach(s => ef[parseInt(s.dataset.i, 10)] = parseInt(s.value || "0", 10));
+    box.querySelectorAll(".tl-efv").forEach(inp => efv[parseInt(inp.dataset.i, 10)] = parseInt(inp.value || "0", 10));
+    levels.push({
+      level: l + 1,
+      hide: parseInt(box.querySelector(".tl-hide").value, 10),
+      type: parseInt(box.querySelector(".tl-type").value || "0", 10),
+      goal: parseInt(box.querySelector(".tl-goal").value || "0", 10),
+      ef, efv,
+      name: box.querySelector(".tl-name").value,
+      category: parseInt(box.querySelector(".tl-cat").value || "0", 10),
+      idx: parseInt(box.dataset.idx || "0", 10),
+      color: parseInt(box.querySelector(".tl-color").value || "0", 10),
+    });
+  });
+  const { body } = await api(`/api/titles/${titleEditIndex}`, { method: "POST", body: JSON.stringify(levels) });
+  if (!body.sucesso) { $("modalTitleErro").textContent = body.mensagem; return; }
+  showMsg("tituloSelftest", `Salvo. Backup: ${body.dados.backup}.`, false);
+  $("modalTitle").classList.add("hidden");
+  ALL_TITLES = null;            // invalida cache p/ refletir mudanças
+  await loadTitlesTab();
+}
+
 /* ---------- ÍCONES ---------- */
 let ICONMAP = {};          // { iconId: [atlas, cell] }
 let ICONMETA = null;
@@ -1202,3 +1315,8 @@ $("evtBtnBuscar").onclick = evtBuscarItens;
 $("evtBuscaItem").addEventListener("keydown", e => { if (e.key === "Enter") evtBuscarItens(); });
 $("evtEnviar").onclick = evtEnviar;
 $("evtTodos").addEventListener("change", e => { $("evtTarget").disabled = e.target.checked; });
+/* Títulos */
+$("btnBuscarTitulo").onclick = renderTitlesTable;
+$("buscaTitulo").addEventListener("keydown", e => { if (e.key === "Enter") renderTitlesTable(); });
+$("tCancelar").onclick = () => $("modalTitle").classList.add("hidden");
+$("tSalvar").onclick = saveTitleEdit;

@@ -32,6 +32,7 @@
       <button class="tab" data-tab="evento">Itens Evento (T)</button>
       <button class="tab" data-tab="quests">Quests</button>
       <button class="tab" data-tab="icones">Ícones</button>
+      <button class="tab" data-tab="titulos">Títulos</button>
     </nav>
     <button id="btnSair" class="ghost">Sair</button>
   </header>
@@ -265,6 +266,20 @@
         </div>
         <p class="muted" style="margin-top:14px">Dica: digite um IconID na busca de Itens, anote a célula correspondente aqui e vincule — assim o painel passa a mostrar o ícone real desse item.</p>
       </div>
+    </div>
+  </section>
+
+  <section id="tab-titulos" class="tab-pane hidden">
+    <div class="barra">
+      <input id="buscaTitulo" placeholder="buscar por nome ou índice…" />
+      <button id="btnBuscarTitulo">Buscar</button>
+      <span id="tituloSelftest" class="muted"></span>
+    </div>
+    <div class="tabela-wrap">
+      <table id="tblTitulos">
+        <thead><tr><th>#</th><th>Nome</th><th>Cat.</th><th>Atributos (nível 1)</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
     </div>
   </section>
 </div>
@@ -661,6 +676,20 @@
     <div class="modal-acoes">
       <button id="ciCancelar" class="ghost">Cancelar</button>
       <button id="ciSalvar" class="primary">Salvar item</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT TITLE (Title.bin) -->
+<div id="modalTitle" class="modal hidden">
+  <div class="modal-box modal-box-xl">
+    <h2>Editar título — <span id="tTitulo"></span></h2>
+    <div class="aviso">⚠ Edita o <b>Title.bin do server</b>. Reinicie o server para aplicar. A sincronização com o client (nomes) é um passo futuro.</div>
+    <div id="tLevels" class="char-cols"></div>
+    <div id="modalTitleErro" class="erro"></div>
+    <div class="modal-acoes">
+      <button id="tCancelar" class="ghost">Cancelar</button>
+      <button id="tSalvar" class="primary">Salvar título</button>
     </div>
   </div>
 </div>
