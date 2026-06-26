@@ -25,6 +25,7 @@
     <strong>AikaPanel</strong>
     <nav>
       <button class="tab ativo" data-tab="cash">Cash Shop</button>
+      <button class="tab" data-tab="itens">Itens</button>
       <button class="tab" data-tab="quests">Quests</button>
     </nav>
     <button id="btnSair" class="ghost">Sair</button>
@@ -52,6 +53,30 @@
       <button id="cashPrev">&laquo; Anterior</button>
       <span id="cashPag"></span>
       <button id="cashNext">Próxima &raquo;</button>
+    </div>
+  </section>
+
+  <!-- ITENS -->
+  <section id="tab-itens" class="tab-pane hidden">
+    <div class="toolbar">
+      <input id="buscaItem" placeholder="Buscar por ID, Nome (PT) ou Nome (EN)..." />
+      <button id="btnBuscarItem">Buscar</button>
+      <span id="itemStats" class="stats"></span>
+    </div>
+    <div id="itemMsg" class="msg"></div>
+    <div class="tabela-wrap">
+      <table id="tblItens">
+        <thead><tr>
+          <th>ID</th><th>Nome (PT)</th><th>Nome (EN)</th><th>Tipo</th>
+          <th>Level</th><th>Preço (gold)</th><th>IconID</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <button id="itemPrev">&laquo; Anterior</button>
+      <span id="itemPag"></span>
+      <button id="itemNext">Próxima &raquo;</button>
     </div>
   </section>
 
@@ -92,6 +117,56 @@
     <div class="modal-acoes">
       <button id="mCancelar" class="ghost">Cancelar</button>
       <button id="mSalvar" class="primary">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT ITEM -->
+<div id="modalItem" class="modal hidden">
+  <div class="modal-box modal-box-lg">
+    <h2>Editar item — <span id="iId"></span></h2>
+    <div class="campo-linha">
+      <div class="campo"><label>Nome PT (máx 64)</label><input id="iNome" maxlength="64" /></div>
+      <div class="campo"><label>Nome EN (máx 64)</label><input id="iNomeEn" maxlength="64" /></div>
+    </div>
+    <div class="campo"><label>Descrição (máx 128)</label><textarea id="iDesc" maxlength="128" rows="2"></textarea></div>
+    <div class="campo-linha">
+      <div class="campo"><label>ItemType</label><input id="iItemType" type="number" min="0" max="65535" /></div>
+      <div class="campo"><label>UseEffect</label><input id="iUseEffect" type="number" min="0" max="65535" /></div>
+      <div class="campo"><label>Level</label><input id="iLevel" type="number" min="0" max="65535" /></div>
+      <div class="campo"><label>IconID</label><input id="iIconID" type="number" min="0" max="65535" /></div>
+    </div>
+    <div class="campo-linha">
+      <div class="campo"><label>Classe</label><input id="iClasse" type="number" min="0" max="65535" /></div>
+      <div class="campo"><label>TypeItem (raridade)</label><input id="iTypeItem" type="number" min="0" max="255" /></div>
+      <div class="campo"><label>TypeTrade</label><input id="iTypeTrade" type="number" min="0" max="255" /></div>
+    </div>
+    <fieldset class="grupo"><legend>Preços</legend>
+      <div class="campo-linha">
+        <div class="campo"><label>PriceGold</label><input id="iPriceGold" type="number" min="0" /></div>
+        <div class="campo"><label>PriceHonor</label><input id="iPriceHonor" type="number" min="0" /></div>
+        <div class="campo"><label>PriceMedal</label><input id="iPriceMedal" type="number" min="0" /></div>
+        <div class="campo"><label>SellPrince</label><input id="iSellPrince" type="number" min="0" /></div>
+      </div>
+      <div class="campo-linha">
+        <div class="campo"><label>TypePriceItem</label><input id="iTypePriceItem" type="number" min="0" max="65535" /></div>
+        <div class="campo"><label>TypePriceItemValue</label><input id="iTypePriceItemValue" type="number" min="0" max="65535" /></div>
+      </div>
+    </fieldset>
+    <fieldset class="grupo"><legend>Atributos</legend>
+      <div class="campo-linha">
+        <div class="campo"><label>ATKFis</label><input id="iATKFis" type="number" min="0" max="65535" /></div>
+        <div class="campo"><label>DefFis</label><input id="iDefFis" type="number" min="0" max="65535" /></div>
+        <div class="campo"><label>MagATK</label><input id="iMagATK" type="number" min="0" max="65535" /></div>
+        <div class="campo"><label>DefMag</label><input id="iDefMag" type="number" min="0" max="65535" /></div>
+        <div class="campo"><label>HP</label><input id="iHP" type="number" min="0" max="65535" /></div>
+        <div class="campo"><label>MP</label><input id="iMP" type="number" min="0" max="65535" /></div>
+      </div>
+    </fieldset>
+    <div id="modalItemErro" class="erro"></div>
+    <div class="modal-acoes">
+      <button id="iCancelar" class="ghost">Cancelar</button>
+      <button id="iSalvar" class="primary">Salvar</button>
     </div>
   </div>
 </div>

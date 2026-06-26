@@ -4,6 +4,8 @@ let cashPage = 1;
 const PAGE = 50;
 let questCols = [];
 let questRows = [];
+let itemPage = 1;
+let itensLoaded = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,7 +37,9 @@ async function login() {
 function setTab(name) {
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("ativo", t.dataset.tab === name));
   $("tab-cash").classList.toggle("hidden", name !== "cash");
+  $("tab-itens").classList.toggle("hidden", name !== "itens");
   $("tab-quests").classList.toggle("hidden", name !== "quests");
+  if (name === "itens" && !itensLoaded) { itensLoaded = true; loadItens(); }
   if (name === "quests" && questRows.length === 0) loadQuests();
 }
 
@@ -144,6 +148,70 @@ async function saveQuests() {
   else showMsg("questMsg", body.mensagem, true);
 }
 
+/* ---------- ITENS ---------- */
+const ITEM_NUM = ["itemType","useEffect","level","iconID","classe","typeItem","typeTrade",
+  "priceGold","priceHonor","priceMedal","sellPrince","typePriceItem","typePriceItemValue",
+  "atkFis","defFis","magATK","defMag","hp","mp"];
+const ITEM_MAP = { iItemType:"itemType", iUseEffect:"useEffect", iLevel:"level", iIconID:"iconID",
+  iClasse:"classe", iTypeItem:"typeItem", iTypeTrade:"typeTrade", iPriceGold:"priceGold",
+  iPriceHonor:"priceHonor", iPriceMedal:"priceMedal", iSellPrince:"sellPrince",
+  iTypePriceItem:"typePriceItem", iTypePriceItemValue:"typePriceItemValue",
+  iATKFis:"atkFis", iDefFis:"defFis", iMagATK:"magATK", iDefMag:"defMag", iHP:"hp", iMP:"mp" };
+
+async function loadItens() {
+  const q = encodeURIComponent($("buscaItem").value.trim());
+  const { body } = await api(`/api/itens?q=${q}&page=${itemPage}&limit=${PAGE}`);
+  if (!body.sucesso) { showMsg("itemMsg", body.mensagem, true); return; }
+  const d = body.dados;
+  $("itemStats").textContent = `${d.total} registros — ${d.matched} na lista`;
+  const tb = $("tblItens").querySelector("tbody");
+  tb.innerHTML = "";
+  for (const it of d.itens) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${it.id}</td>
+      <td>${esc(it.name)}</td>
+      <td>${esc(it.nameEnglish)}</td>
+      <td>${it.itemType}</td>
+      <td>${it.level}</td>
+      <td>${it.priceGold.toLocaleString("pt-BR")}</td>
+      <td>${it.iconID}</td>
+      <td><button class="primary">Editar</button></td>`;
+    tr.querySelector("button").onclick = () => openItemEdit(it);
+    tb.appendChild(tr);
+  }
+  const maxPag = Math.max(1, Math.ceil(d.matched / PAGE));
+  $("itemPag").textContent = `Página ${d.page} de ${maxPag}`;
+  $("itemPrev").disabled = d.page <= 1;
+  $("itemNext").disabled = !d.tem_mais;
+}
+
+function openItemEdit(it) {
+  $("iId").textContent = `ID ${it.id}`;
+  $("iSalvar").dataset.id = it.id;
+  $("iNome").value = it.name;
+  $("iNomeEn").value = it.nameEnglish;
+  $("iDesc").value = it.descricao;
+  for (const [el, key] of Object.entries(ITEM_MAP)) $(el).value = it[key];
+  $("modalItemErro").textContent = "";
+  $("modalItem").classList.remove("hidden");
+}
+
+async function saveItemEdit() {
+  $("modalItemErro").textContent = "";
+  const id = parseInt($("iSalvar").dataset.id, 10);
+  const payload = { name: $("iNome").value, nameEnglish: $("iNomeEn").value, descricao: $("iDesc").value };
+  for (const [el, key] of Object.entries(ITEM_MAP)) payload[key] = parseInt($(el).value || "0", 10);
+  const { body } = await api(`/api/itens/${id}`, { method: "POST", body: JSON.stringify(payload) });
+  if (body.sucesso) {
+    $("modalItem").classList.add("hidden");
+    showMsg("itemMsg", `Salvo. Backup: ${body.dados.backup}. Reinicie o servidor para aplicar.`, false);
+    loadItens();
+  } else {
+    $("modalItemErro").textContent = body.mensagem || "Erro ao salvar.";
+  }
+}
+
 /* ---------- HELPERS ---------- */
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function showMsg(id, txt, isErr) { const e = $(id); e.textContent = txt; e.className = "msg " + (isErr ? "err" : "ok"); }
@@ -163,3 +231,9 @@ $("mSalvar").onclick = saveEdit;
 $("btnAddQuest").onclick = addQuest;
 $("btnSalvarQuests").onclick = saveQuests;
 $("buscaQuest").addEventListener("input", renderQuests);
+$("btnBuscarItem").onclick = () => { itemPage = 1; loadItens(); };
+$("buscaItem").addEventListener("keydown", e => { if (e.key === "Enter") { itemPage = 1; loadItens(); } });
+$("itemPrev").onclick = () => { if (itemPage > 1) { itemPage--; loadItens(); } };
+$("itemNext").onclick = () => { itemPage++; loadItens(); };
+$("iCancelar").onclick = () => $("modalItem").classList.add("hidden");
+$("iSalvar").onclick = saveItemEdit;

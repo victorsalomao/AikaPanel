@@ -70,6 +70,53 @@ public sealed class CashRepository
     }
 }
 
+public sealed class ItemRepository
+{
+    private readonly string _path;
+    private readonly object _lock = new();
+    public ItemRepository(PanelConfig cfg) => _path = Path.Combine(cfg.DataDir, "ItemList.bin");
+
+    public string FilePath => _path;
+    public bool Exists => File.Exists(_path);
+
+    public byte[] ReadAll()
+    {
+        var bytes = File.ReadAllBytes(_path);
+        int rem = bytes.Length % ItemList.RecordSize;
+        if (rem != 0 && rem != ItemList.TrailerSize)
+            throw new InvalidOperationException(
+                $"ItemList.bin tem {bytes.Length} bytes (resto {rem}). Esperado multiplo de {ItemList.RecordSize} (+{ItemList.TrailerSize} de trailer). Arquivo invalido.");
+        return bytes;
+    }
+
+    public List<ItemEntry> DecodeAll()
+    {
+        var bytes = ReadAll();
+        int count = bytes.Length / ItemList.RecordSize;
+        var list = new List<ItemEntry>(count);
+        for (int i = 0; i < count; i++)
+            list.Add(ItemList.Decode(bytes.AsSpan(i * ItemList.RecordSize, ItemList.RecordSize), i));
+        return list;
+    }
+
+    public (bool ok, int total, int firstMismatch) SelfTest() => ItemList.SelfTest(ReadAll());
+
+    public string Update(int id, ItemEdit edit)
+    {
+        lock (_lock)
+        {
+            var bytes = ReadAll();
+            int count = bytes.Length / ItemList.RecordSize;
+            if (id < 0 || id >= count)
+                throw new ArgumentOutOfRangeException(nameof(id), $"ID {id} fora do intervalo (0..{count - 1}).");
+            var bak = Backup.Make(_path);
+            ItemList.ApplyEdit(bytes.AsSpan(id * ItemList.RecordSize, ItemList.RecordSize), edit);
+            File.WriteAllBytes(_path, bytes);
+            return bak;
+        }
+    }
+}
+
 public sealed class QuestRepository
 {
     // Column names derived from Load.pas InitQuests (authoritative — file is headerless).

@@ -18,15 +18,23 @@ if (File.Exists(cfgPath))
 
 var cash = new CashRepository(cfg);
 var quests = new QuestRepository(cfg);
+var items = new ItemRepository(cfg);
 
 // --- Headless self-test mode (run before trusting the UI) ---
 if (args.Contains("--selftest"))
 {
     try
     {
-        var (ok, total, mismatch) = cash.SelfTest();
-        if (ok) { Console.WriteLine($"ROUND-TRIP OK {total}/{total}"); return 0; }
-        Console.WriteLine($"ROUND-TRIP FAIL at slot {mismatch} (of {total})"); return 1;
+        int rc = 0;
+        var c = cash.SelfTest();
+        Console.WriteLine(c.ok ? $"PI.bin       ROUND-TRIP OK {c.total}/{c.total}"
+                               : $"PI.bin       ROUND-TRIP FAIL at slot {c.firstMismatch} (of {c.total})");
+        if (!c.ok) rc = 1;
+        var it = items.SelfTest();
+        Console.WriteLine(it.ok ? $"ItemList.bin ROUND-TRIP OK {it.total}/{it.total}"
+                                : $"ItemList.bin ROUND-TRIP FAIL at id {it.firstMismatch} (of {it.total})");
+        if (!it.ok) rc = 1;
+        return rc;
     }
     catch (Exception ex) { Console.WriteLine("SELFTEST ERROR: " + ex.Message); return 2; }
 }
@@ -143,6 +151,57 @@ app.MapPost("/api/quests", (QuestsSaveDto dto) =>
         return Results.Json(Ok(new { backup = Path.GetFileName(bak), linhas = rows.Count }, "Quests salvas. Reinicie o servidor para aplicar."));
     }
     catch (Exception ex) { return Results.Json(Err("ERRO_GRAVACAO", ex.Message), statusCode: 400); }
+});
+
+// --- Itens (ItemList.bin) ---
+app.MapGet("/api/itens", (string? q, int page = 1, int limit = 50) =>
+{
+    if (!items.Exists) return Results.Json(Err("ARQUIVO_NAO_ENCONTRADO", $"ItemList.bin nao encontrado em {items.FilePath}"), statusCode: 404);
+    try
+    {
+        var all = items.DecodeAll();
+        int total = all.Count;
+        IEnumerable<ItemEntry> filtered = all;
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var s = q.Trim();
+            filtered = filtered.Where(x =>
+                x.Id.ToString() == s ||
+                x.Name.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                x.NameEnglish.Contains(s, StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            // Sem busca: esconder slots totalmente vazios (sem nenhum nome) para a lista ficar util
+            filtered = filtered.Where(x => x.Name.Length > 0 || x.NameEnglish.Length > 0);
+        }
+        var list = filtered.ToList();
+        int matched = list.Count;
+        if (limit < 1) limit = 50;
+        var pageItems = list.Skip((Math.Max(1, page) - 1) * limit).Take(limit).ToList();
+        return Results.Json(Ok(new { itens = pageItems, total, matched, page, limit, tem_mais = (Math.Max(1, page) - 1) * limit + pageItems.Count < matched }));
+    }
+    catch (Exception ex) { return Results.Json(Err("ERRO_LEITURA", ex.Message), statusCode: 400); }
+});
+
+app.MapPost("/api/itens/{id:int}", (int id, ItemEdit edit) =>
+{
+    if (!items.Exists) return Results.Json(Err("ARQUIVO_NAO_ENCONTRADO", "ItemList.bin nao encontrado."), statusCode: 404);
+    if (edit.Name.Length > 64) return Results.Json(Err("NOME_LONGO", "Nome excede 64 caracteres."), statusCode: 400);
+    if (edit.NameEnglish.Length > 64) return Results.Json(Err("NOME_EN_LONGO", "Nome EN excede 64 caracteres."), statusCode: 400);
+    if (edit.Descricao.Length > 128) return Results.Json(Err("DESC_LONGA", "Descricao excede 128 caracteres."), statusCode: 400);
+    try
+    {
+        var bak = items.Update(id, edit);
+        return Results.Json(Ok(new { backup = Path.GetFileName(bak) }, "Item salvo. Reinicie o servidor para aplicar."));
+    }
+    catch (Exception ex) { return Results.Json(Err("ERRO_GRAVACAO", ex.Message), statusCode: 400); }
+});
+
+app.MapGet("/api/itens/selftest", () =>
+{
+    try { var (ok, total, mm) = items.SelfTest(); return Results.Json(Ok(new { ok, total, firstMismatch = mm })); }
+    catch (Exception ex) { return Results.Json(Err("ERRO_SELFTEST", ex.Message), statusCode: 400); }
 });
 
 Console.WriteLine($"AikaPanel em http://{cfg.Host}:{cfg.Port}  (DataDir: {cfg.DataDir})");

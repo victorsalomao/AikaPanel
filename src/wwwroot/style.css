@@ -57,3 +57,7 @@ tbody tr:hover { background: #f9fafb; }
 .campo-linha { display: flex; gap: 12px; }
 .campo-linha .campo { flex: 1; }
 .modal-acoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.modal-box-lg { width: 720px; }
+.campo-linha .campo input { width: 100%; }
+.grupo { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px 2px; margin-bottom: 12px; }
+.grupo legend { font-size: 12px; font-weight: 700; color: #374151; padding: 0 6px; }
