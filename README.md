@@ -5,6 +5,7 @@ com saída **byte-exata** (idêntica à que o servidor já espera) através de u
 amigável em português:
 
 - **Cash Shop** — `Data\PI.bin` (6000 registros de 376 bytes)
+- **Itens** — `Data\ItemList.bin` (31000 registros de 464 bytes)
 - **Quests** — `Data\Quest\Quests.csv`
 
 É um único `.exe` self-contained (.NET 8, win-x64). Não precisa instalar nada no VPS.
@@ -66,6 +67,24 @@ re-serializa e confere byte a byte. Deve imprimir `ROUND-TRIP OK 6000/6000`.
 - **Prova de exatidão:** ler todos os 6000 registros e regravá-los sem alteração produz um
   arquivo idêntico ao original (`--selftest` → `ROUND-TRIP OK 6000/6000`).
 
+### Itens (`ItemList.bin`)
+- Cada item é um registro **packed** de **464 bytes** (`TItemFromList` em
+  `Src\Data\FilesData.pas`), little-endian, strings Windows-1252. O arquivo tem 31000
+  registros + 4 bytes finais (trailer) **preservados intactos**.
+- ID = índice do registro no array (0..30999).
+- Campos editáveis: Nome (PT), Nome (EN), Descrição, ItemType, UseEffect, Level, IconID,
+  Classe, TypeItem (raridade), TypeTrade, preços (PriceGold/Honor/Medal/SellPrince,
+  TypePriceItem/Value) e atributos (ATKFis/DefFis/MagATK/DefMag/HP/MP).
+- Todo byte não editado é preservado (mesma técnica do `PI.bin`).
+- **Prova de exatidão:** `--selftest` → `ItemList.bin ROUND-TRIP OK 31000/31000`.
+- **Ícones:** o `IconID` é mostrado/editado como número. O atlas de ícones é
+  `AIKAClient\UI\ItemIcons01..11.jit` (1024×1024, células de 32×32 = 1024 ícones por atlas).
+  Existe um conversor JIT→PNG funcional em `tools\jit2png\` (uso:
+  `dotnet run -- <arquivo.jit> <saida.png> [maxSize]`). **Pendente:** a fórmula exata
+  IconID→(atlas,célula) **não** é o mapeamento sequencial simples (`atlas=IconID/1024`) —
+  a verificação falhou; a lógica de seleção do atlas está no `AIKA.exe` (sem fonte) e
+  precisa de mais engenharia reversa. Por isso o thumbnail por item **não** foi embutido.
+
 ### Quests (`Quests.csv`)
 - O servidor lê `Data\Quest\Quests.csv` **diretamente no boot** (`InitQuests` em `Load.pas`)
   e atribui as quests aos NPCs. **Não há compilação CSV→Quest.bin** — editar o CSV funciona.
@@ -74,8 +93,9 @@ re-serializa e confere byte a byte. Deve imprimir `ROUND-TRIP OK 6000/6000`.
 
 ### Segurança (sempre)
 - Antes de **qualquer** gravação, é criada uma cópia com data/hora:
-  `PI.bin.AAAAMMDD-hhmmss.bak` / `Quests.csv.AAAAMMDD-hhmmss.bak` na mesma pasta.
-- O `PI.bin` é validado (tamanho múltiplo de 376, +4 de trailer); recusa se inválido.
+  `PI.bin.AAAAMMDD-hhmmss.bak` / `ItemList.bin.AAAAMMDD-hhmmss.bak` /
+  `Quests.csv.AAAAMMDD-hhmmss.bak` na mesma pasta.
+- `PI.bin` e `ItemList.bin` são validados (tamanho múltiplo do registro, +4 de trailer); recusa se inválido.
 - Nunca grava registro parcial.
 
 ---

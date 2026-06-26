@@ -18,6 +18,11 @@ Edits two data files with BYTE-EXACT output the server already expects. Friendly
 - REQ-05 Backup target to timestamped `.bak` before any write. Validate size % 376 == 0; refuse otherwise.
 - REQ-06 Round-trip self-test: decode→encode of all 6000 records == original bytes (proof of byte-exactness).
 - REQ-07 Quests: edit `Quest\Quests.csv` (34 cols, headerless). Table edit/add/delete rows, save with backup.
+- REQ-08 Itens: read/edit `ItemList.bin` (31000 × 464-byte packed `TItemFromList`, LE, Win-1252, +4 trailer).
+  Offsets authoritative from FilesData.pas (sum==464). Editable: Name/NameEnglish/Descrition/ItemType/UseEffect/
+  Level/IconID/Classe/TypeItem/TypeTrade/prices/stats. Searchable by ID/PT/EN. Backup + round-trip self-test.
+- REQ-09 (bônus) Ícones: atlas ItemIcons01..11.jit (1024×1024, 32px cells). JIT→PNG decoder in tools/jit2png.
+  IconID→cell formula NOT simple-sequential (verification failed) → IconID as number; thumbnails deferred (AIKA.exe RE).
 
 ## Quest pipeline finding (CRITICAL — verified)
 Load.pas `InitQuests` (L863) reads `Quests.csv` DIRECTLY into `_Quests` at boot and assigns to NPCs (L1834).
