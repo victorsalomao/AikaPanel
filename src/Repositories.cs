@@ -12,6 +12,12 @@ public sealed class PanelConfig
     public string ClientUIDir { get; set; } = "";
     // Raiz do client (onde ficam ItemList4.bin e SkillData4.bin cifrados v4). Vazio = nao sincroniza.
     public string ClientGameDir { get; set; } = "";
+    // MySQL (caelite) — vazio = lido do Bin\AikaServer.ini [MySQL]. Override opcional via appsettings "Mysql".
+    public string MysqlServer { get; set; } = "";
+    public uint MysqlPort { get; set; }
+    public string MysqlDatabase { get; set; } = "";
+    public string MysqlUser { get; set; } = "";
+    public string MysqlPassword { get; set; } = "";
 }
 
 /// <summary>Resultado generico de um sync de arquivo cifrado do client.</summary>
@@ -129,11 +135,14 @@ public sealed class CashSyncStatus
 
 public static class Backup
 {
-    /// <summary>Copies file to a timestamped .bak next to it. Returns backup path.</summary>
+    /// <summary>Copies file to a timestamped .bak next to it. Returns backup path.
+    /// Appends a counter if a backup with the same second already exists (avoids collisions
+    /// when two saves/a save+delete happen within the same second).</summary>
     public static string Make(string path)
     {
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
         var bak = $"{path}.{stamp}.bak";
+        for (int i = 1; File.Exists(bak); i++) bak = $"{path}.{stamp}-{i}.bak";
         File.Copy(path, bak, overwrite: false);
         return bak;
     }
@@ -302,6 +311,29 @@ public sealed class ItemRepository
             return (Path.GetFileName(bak), client);
         }
     }
+
+    /// <summary>Decodes a single item by id (cheap: reads file once, slices one record).</summary>
+    public ItemEntry? GetOne(int id)
+    {
+        var bytes = ReadAll();
+        int count = bytes.Length / ItemList.RecordSize;
+        if (id < 0 || id >= count) return null;
+        return ItemList.Decode(bytes.AsSpan(id * ItemList.RecordSize, ItemList.RecordSize), id);
+    }
+
+    /// <summary>Sets only the gold sell price (SellPrince) of an item, preserving every other field.
+    /// Forces TypePriceItem=0 (gold) so the NPC shop charges gold, then re-syncs the client.</summary>
+    public (string serverBackup, ClientSyncResult client) UpdateSellPrice(int id, uint sellPrince)
+    {
+        lock (_lock)
+        {
+            var cur = GetOne(id) ?? throw new ArgumentOutOfRangeException(nameof(id), $"Item {id} fora do intervalo.");
+            var edit = ItemList.ToEdit(cur);
+            edit.SellPrince = sellPrince;
+            edit.TypePriceItem = 0; // escambo off -> cobra ouro
+            return Update(id, edit);
+        }
+    }
 }
 
 public sealed class SkillRepository
@@ -424,6 +456,50 @@ public sealed class QuestRepository
             var bak = Backup.Make(_path);
             File.WriteAllText(_path, sb.ToString(), new UTF8Encoding(false));
             return bak;
+        }
+    }
+}
+
+public sealed class TitleRepository
+{
+    private readonly string _path;
+    private readonly object _lock = new();
+    public TitleRepository(PanelConfig cfg) { _path = Path.Combine(cfg.DataDir, "Title.bin"); }
+
+    public string FilePath => _path;
+    public bool Exists => File.Exists(_path);
+
+    public byte[] ReadAll()
+    {
+        var b = File.ReadAllBytes(_path);
+        if (b.Length != TitleBin.ExpectedFileSize)
+            throw new InvalidOperationException(
+                $"Title.bin tem {b.Length} bytes (esperado {TitleBin.ExpectedFileSize}). Arquivo invalido.");
+        return b;
+    }
+
+    public List<TitleData> DecodeAll() => TitleBin.DecodeAll(ReadAll());
+
+    public (bool ok, int total, int firstMismatch) SelfTest() => TitleBin.SelfTest(ReadAll());
+
+    /// <summary>Backup + aplica os 4 níveis do título `index` + grava Data\Title.bin. Trailing preservado.</summary>
+    public string Update(int index, List<TitleLevelData> levels)
+    {
+        lock (_lock)
+        {
+            if (index < 0 || index >= TitleBin.TitleCount)
+                throw new ArgumentOutOfRangeException(nameof(index), $"Indice {index} fora de 0..{TitleBin.TitleCount - 1}.");
+            if (levels == null || levels.Count != TitleBin.LevelsPerTitle)
+                throw new ArgumentException($"Esperado {TitleBin.LevelsPerTitle} niveis, veio {levels?.Count ?? 0}.");
+            var bytes = ReadAll();
+            var bak = Backup.Make(_path);
+            for (int l = 0; l < TitleBin.LevelsPerTitle; l++)
+            {
+                int off = (index * TitleBin.LevelsPerTitle + l) * TitleBin.LevelSize;
+                TitleBin.ApplyLevel(bytes.AsSpan(off, TitleBin.LevelSize), levels[l]);
+            }
+            File.WriteAllBytes(_path, bytes);
+            return Path.GetFileName(bak);
         }
     }
 }
