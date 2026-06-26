@@ -10,6 +10,101 @@ public sealed class PanelConfig
     public string Password { get; set; } = "";
     // Pasta UI do client (vitrine cifrada da Loja de Cash). Vazio = nao sincroniza.
     public string ClientUIDir { get; set; } = "";
+    // Raiz do client (onde ficam ItemList4.bin e SkillData4.bin cifrados v4). Vazio = nao sincroniza.
+    public string ClientGameDir { get; set; } = "";
+}
+
+/// <summary>Resultado generico de um sync de arquivo cifrado do client.</summary>
+public sealed class ClientSyncResult
+{
+    public bool Configured { get; set; }
+    public bool Synced { get; set; }
+    public string? Backup { get; set; }
+    public string Mensagem { get; set; } = "";
+}
+
+/// <summary>Estado de sync de um arquivo cifrado do client v4 (header + corpo).</summary>
+public sealed class ClientSyncStatus
+{
+    public bool Configured { get; set; }
+    public string ClientPath { get; set; } = "";
+    public bool Exists { get; set; }
+    public string Header { get; set; } = "";
+    public bool InSync { get; set; }
+    public string Mensagem { get; set; } = "";
+}
+
+/// <summary>
+/// Sincroniza um arquivo cifrado v4 do client (header de 12 bytes + corpo cifrado) a partir do
+/// arquivo CRU do server. Push completo: client = header_existente + Encrypt(serverRaw, key).
+/// Preserva o header do client byte-a-byte; so os corpos dos registros mudam.
+/// </summary>
+public sealed class V4ClientSync
+{
+    private readonly string _path;
+    private readonly byte[] _key;
+    public V4ClientSync(string clientPath, byte[] key) { _path = clientPath; _key = key; }
+
+    public bool Configured => _path.Length > 0;
+    public string Path => _path;
+    public bool Exists => Configured && File.Exists(_path);
+
+    private byte[]? ReadHeader()
+    {
+        if (!Exists) return null;
+        var hdr = new byte[V4Cipher.HeaderLen];
+        using var fs = File.OpenRead(_path);
+        if (fs.Read(hdr, 0, hdr.Length) != hdr.Length) return null;
+        return hdr;
+    }
+
+    private static string HeaderTag(byte[] hdr)
+    {
+        int n = Array.IndexOf(hdr, (byte)0); if (n < 0) n = hdr.Length;
+        return System.Text.Encoding.ASCII.GetString(hdr, 0, n);
+    }
+
+    /// <summary>Reescreve o client = header existente + Encrypt(serverRaw). Backup antes.</summary>
+    public ClientSyncResult Push(byte[] serverRaw)
+    {
+        var res = new ClientSyncResult { Configured = Configured };
+        if (!Configured) { res.Mensagem = "Sync do client desativado."; return res; }
+        var hdr = ReadHeader();
+        if (hdr == null) { res.Mensagem = $"Arquivo v4 do client nao encontrado: {_path}"; return res; }
+        try
+        {
+            var body = V4Cipher.Encrypt(serverRaw, _key);
+            res.Backup = System.IO.Path.GetFileName(Backup.Make(_path));
+            using (var fs = File.Create(_path)) { fs.Write(hdr, 0, hdr.Length); fs.Write(body, 0, body.Length); }
+            res.Synced = true;
+            res.Mensagem = $"Client v4 ({HeaderTag(hdr)}) sincronizado.";
+        }
+        catch (Exception ex) { res.Mensagem = "Falha ao sincronizar client: " + ex.Message; }
+        return res;
+    }
+
+    /// <summary>InSync quando client[12:] == Encrypt(serverRaw, key) e o header foi preservado.</summary>
+    public ClientSyncStatus Status(byte[] serverRaw)
+    {
+        var st = new ClientSyncStatus { Configured = Configured, ClientPath = _path };
+        if (!Configured) { st.Mensagem = "Sync do client desativado."; return st; }
+        st.Exists = File.Exists(_path);
+        if (!st.Exists) { st.Mensagem = "Arquivo v4 do client nao encontrado."; return st; }
+        try
+        {
+            var cur = File.ReadAllBytes(_path);
+            var hdr = new byte[V4Cipher.HeaderLen];
+            Array.Copy(cur, hdr, V4Cipher.HeaderLen);
+            st.Header = HeaderTag(hdr);
+            var expected = V4Cipher.Encrypt(serverRaw, _key);
+            st.InSync = cur.Length == V4Cipher.HeaderLen + expected.Length
+                        && cur.AsSpan(V4Cipher.HeaderLen).SequenceEqual(expected);
+            st.Mensagem = st.InSync ? $"Server ↔ client ({st.Header}) sincronizados."
+                                    : "Dessincronizados — salve ou clique em Sincronizar.";
+        }
+        catch (Exception ex) { st.Mensagem = "Erro ao verificar sync: " + ex.Message; }
+        return st;
+    }
 }
 
 /// <summary>Resultado de um save da Loja de Cash (server cru + sync client cifrado).</summary>
@@ -155,11 +250,19 @@ public sealed class CashRepository
 public sealed class ItemRepository
 {
     private readonly string _path;
+    private readonly V4ClientSync _client;
     private readonly object _lock = new();
-    public ItemRepository(PanelConfig cfg) => _path = Path.Combine(cfg.DataDir, "ItemList.bin");
+    public ItemRepository(PanelConfig cfg)
+    {
+        _path = Path.Combine(cfg.DataDir, "ItemList.bin");
+        var cp = string.IsNullOrWhiteSpace(cfg.ClientGameDir) ? "" : Path.Combine(cfg.ClientGameDir, "ItemList4.bin");
+        _client = new V4ClientSync(cp, V4Cipher.Key1);
+    }
 
     public string FilePath => _path;
     public bool Exists => File.Exists(_path);
+    public ClientSyncStatus SyncStatus() => _client.Status(ReadAll());
+    public ClientSyncResult SyncClient() { lock (_lock) { return _client.Push(ReadAll()); } }
 
     public byte[] ReadAll()
     {
@@ -183,7 +286,8 @@ public sealed class ItemRepository
 
     public (bool ok, int total, int firstMismatch) SelfTest() => ItemList.SelfTest(ReadAll());
 
-    public string Update(int id, ItemEdit edit)
+    /// <summary>Backup + edit + grava Data\ItemList.bin (cru), depois sincroniza o ItemList4.bin (cifrado Key1).</summary>
+    public (string serverBackup, ClientSyncResult client) Update(int id, ItemEdit edit)
     {
         lock (_lock)
         {
@@ -194,7 +298,65 @@ public sealed class ItemRepository
             var bak = Backup.Make(_path);
             ItemList.ApplyEdit(bytes.AsSpan(id * ItemList.RecordSize, ItemList.RecordSize), edit);
             File.WriteAllBytes(_path, bytes);
-            return bak;
+            var client = _client.Push(bytes);
+            return (Path.GetFileName(bak), client);
+        }
+    }
+}
+
+public sealed class SkillRepository
+{
+    private readonly string _path;
+    private readonly V4ClientSync _client;
+    private readonly object _lock = new();
+    public SkillRepository(PanelConfig cfg)
+    {
+        _path = Path.Combine(cfg.DataDir, "SkillData.bin");
+        var cp = string.IsNullOrWhiteSpace(cfg.ClientGameDir) ? "" : Path.Combine(cfg.ClientGameDir, "SkillData4.bin");
+        _client = new V4ClientSync(cp, V4Cipher.Key2);
+    }
+
+    public string FilePath => _path;
+    public bool Exists => File.Exists(_path);
+    public ClientSyncStatus SyncStatus() => _client.Status(ReadAll());
+    public ClientSyncResult SyncClient() { lock (_lock) { return _client.Push(ReadAll()); } }
+
+    public byte[] ReadAll()
+    {
+        var bytes = File.ReadAllBytes(_path);
+        int rem = bytes.Length % SkillData.RecordSize;
+        if (rem != 0 && rem != SkillData.TrailerSize)
+            throw new InvalidOperationException(
+                $"SkillData.bin tem {bytes.Length} bytes (resto {rem}). Esperado multiplo de {SkillData.RecordSize} (+{SkillData.TrailerSize} de trailer). Arquivo invalido.");
+        return bytes;
+    }
+
+    public List<SkillEntry> DecodeAll()
+    {
+        var bytes = ReadAll();
+        int count = bytes.Length / SkillData.RecordSize;
+        var list = new List<SkillEntry>(count);
+        for (int i = 0; i < count; i++)
+            list.Add(SkillData.Decode(bytes.AsSpan(i * SkillData.RecordSize, SkillData.RecordSize), i));
+        return list;
+    }
+
+    public (bool ok, int total, int firstMismatch) SelfTest() => SkillData.SelfTest(ReadAll());
+
+    /// <summary>Backup + edit + grava Data\SkillData.bin (cru), depois sincroniza o SkillData4.bin (cifrado Key2).</summary>
+    public (string serverBackup, ClientSyncResult client) Update(int id, SkillEdit edit)
+    {
+        lock (_lock)
+        {
+            var bytes = ReadAll();
+            int count = bytes.Length / SkillData.RecordSize;
+            if (id < 0 || id >= count)
+                throw new ArgumentOutOfRangeException(nameof(id), $"ID {id} fora do intervalo (0..{count - 1}).");
+            var bak = Backup.Make(_path);
+            SkillData.ApplyEdit(bytes.AsSpan(id * SkillData.RecordSize, SkillData.RecordSize), edit);
+            File.WriteAllBytes(_path, bytes);
+            var client = _client.Push(bytes);
+            return (Path.GetFileName(bak), client);
         }
     }
 }

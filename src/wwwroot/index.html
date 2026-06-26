@@ -26,6 +26,7 @@
     <nav>
       <button class="tab ativo" data-tab="cash">Cash Shop</button>
       <button class="tab" data-tab="itens">Itens</button>
+      <button class="tab" data-tab="skills">Skills</button>
       <button class="tab" data-tab="quests">Quests</button>
     </nav>
     <button id="btnSair" class="ghost">Sair</button>
@@ -68,6 +69,11 @@
       <button id="btnBuscarItem">Buscar</button>
       <span id="itemStats" class="stats"></span>
     </div>
+    <div class="sync-bar">
+      <span id="itemSyncBadge" class="sync-badge">verificando…</span>
+      <button id="btnItemSync" class="ghost">Sincronizar client (ItemList4.bin)</button>
+      <span class="muted">server <code>Data\ItemList.bin</code> (cru) ↔ client <code>ItemList4.bin</code> (cifrado Key1)</span>
+    </div>
     <div id="itemMsg" class="msg"></div>
     <div class="tabela-wrap">
       <table id="tblItens">
@@ -82,6 +88,35 @@
       <button id="itemPrev">&laquo; Anterior</button>
       <span id="itemPag"></span>
       <button id="itemNext">Próxima &raquo;</button>
+    </div>
+  </section>
+
+  <!-- SKILLS -->
+  <section id="tab-skills" class="tab-pane hidden">
+    <div class="toolbar">
+      <input id="buscaSkill" placeholder="Buscar por ID, Nome (PT) ou Nome (EN)..." />
+      <button id="btnBuscarSkill">Buscar</button>
+      <span id="skillStats" class="stats"></span>
+    </div>
+    <div class="sync-bar">
+      <span id="skillSyncBadge" class="sync-badge">verificando…</span>
+      <button id="btnSkillSync" class="ghost">Sincronizar client (SkillData4.bin)</button>
+      <span class="muted">server <code>Data\SkillData.bin</code> (cru) ↔ client <code>SkillData4.bin</code> (cifrado Key2)</span>
+    </div>
+    <div id="skillMsg" class="msg"></div>
+    <div class="tabela-wrap">
+      <table id="tblSkills">
+        <thead><tr>
+          <th>ID</th><th>Nome (PT)</th><th>Nome (EN)</th><th>Level</th>
+          <th>Classe</th><th>MP</th><th>Cooldown</th><th>Dano</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <button id="skillPrev">&laquo; Anterior</button>
+      <span id="skillPag"></span>
+      <button id="skillNext">Próxima &raquo;</button>
     </div>
   </section>
 
@@ -172,6 +207,50 @@
     <div class="modal-acoes">
       <button id="iCancelar" class="ghost">Cancelar</button>
       <button id="iSalvar" class="primary">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT SKILL -->
+<div id="modalSkill" class="modal hidden">
+  <div class="modal-box modal-box-lg">
+    <h2>Editar skill — <span id="sId"></span></h2>
+    <div class="campo-linha">
+      <div class="campo"><label>Nome PT (máx 64)</label><input id="sNome" maxlength="64" /></div>
+      <div class="campo"><label>Nome EN (máx 64)</label><input id="sNomeEn" maxlength="64" /></div>
+    </div>
+    <div class="campo"><label>Descrição (máx 288)</label><textarea id="sDesc" maxlength="288" rows="2"></textarea></div>
+    <fieldset class="grupo"><legend>Requisitos / Custo</legend>
+      <div class="campo-linha">
+        <div class="campo"><label>Level</label><input id="sLevel" type="number" min="0" /></div>
+        <div class="campo"><label>MinLevel</label><input id="sMinLevel" type="number" min="0" /></div>
+        <div class="campo"><label>Classe</label><input id="sClasse" type="number" min="0" /></div>
+        <div class="campo"><label>Classification</label><input id="sClassification" type="number" min="0" /></div>
+      </div>
+      <div class="campo-linha">
+        <div class="campo"><label>SkillPoints</label><input id="sSkillPoints" type="number" min="0" /></div>
+        <div class="campo"><label>LearnCosts</label><input id="sLearnCosts" type="number" min="0" /></div>
+        <div class="campo"><label>MP</label><input id="sMP" type="number" min="0" /></div>
+      </div>
+    </fieldset>
+    <fieldset class="grupo"><legend>Efeito</legend>
+      <div class="campo-linha">
+        <div class="campo"><label>Damage</label><input id="sDamage" type="number" min="0" /></div>
+        <div class="campo"><label>Range</label><input id="sRange" type="number" min="0" /></div>
+        <div class="campo"><label>SuccessRate</label><input id="sSuccessRate" type="number" min="0" /></div>
+        <div class="campo"><label>MaxTargets</label><input id="sMaxTargets" type="number" min="0" /></div>
+      </div>
+      <div class="campo-linha">
+        <div class="campo"><label>Cooldown (ms)</label><input id="sCooldown" type="number" min="0" /></div>
+        <div class="campo"><label>CastTime (ms)</label><input id="sCastTime" type="number" min="0" /></div>
+        <div class="campo"><label>Duration (s)</label><input id="sDuration" type="number" min="0" /></div>
+        <div class="campo"><label>TargetType</label><input id="sTargetType" type="number" min="0" /></div>
+      </div>
+    </fieldset>
+    <div id="modalSkillErro" class="erro"></div>
+    <div class="modal-acoes">
+      <button id="sCancelar" class="ghost">Cancelar</button>
+      <button id="sSalvar" class="primary">Salvar</button>
     </div>
   </div>
 </div>

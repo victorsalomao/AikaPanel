@@ -4,8 +4,9 @@ Editor web local para o servidor Aika Online (Delphi). Edita dois arquivos de da
 com saída **byte-exata** (idêntica à que o servidor já espera) através de uma interface
 amigável em português:
 
-- **Cash Shop** — `Data\PI.bin` (6000 registros de 376 bytes)
-- **Itens** — `Data\ItemList.bin` (31000 registros de 464 bytes)
+- **Cash Shop** — `Data\PI.bin` (6000 registros de 376 bytes) + vitrine cifrada do client
+- **Itens** — `Data\ItemList.bin` (31000 registros de 464 bytes) + `ItemList4.bin` cifrado do client
+- **Skills** — `Data\SkillData.bin` (12000 registros de 720 bytes) + `SkillData4.bin` cifrado do client
 - **Quests** — `Data\Quest\Quests.csv`
 
 É um único `.exe` self-contained (.NET 8, win-x64). Não precisa instalar nada no VPS.
@@ -21,6 +22,7 @@ amigável em português:
      "AikaPanel": {
        "DataDir": "C:\\Users\\user\\Downloads\\AikaMerged\\Bin\\Data",
        "ClientUIDir": "C:\\Users\\user\\Downloads\\AnotherAikaDelphi\\AIKAClient\\UI",
+       "ClientGameDir": "C:\\Users\\user\\Downloads\\AnotherAikaDelphi\\AIKAClient",
        "Host": "127.0.0.1",
        "Port": 8099,
        "Password": "troque-esta-senha"
@@ -28,10 +30,12 @@ amigável em português:
    }
    ```
 
-   - `DataDir` — pasta `Data` do servidor (onde estão `PI.bin`, `ItemList.bin` e `Quest\Quests.csv`).
+   - `DataDir` — pasta `Data` do servidor (`PI.bin`, `ItemList.bin`, `SkillData.bin`, `Quest\Quests.csv`).
    - `ClientUIDir` — pasta `UI` do **client** (onde fica o `PI.bin` CIFRADO da vitrine da loja).
-     Ao salvar a Loja de Cash, o painel grava os DOIS: o `Data\PI.bin` cru (server) e o
-     `UI\PI.bin` cifrado (client). Deixe **vazio** (`""`) para desativar o sync do client.
+     Ao salvar a Loja de Cash, o painel grava os DOIS: `Data\PI.bin` cru + `UI\PI.bin` cifrado.
+   - `ClientGameDir` — **raiz** do client (onde ficam `ItemList4.bin` e `SkillData4.bin` cifrados v4).
+     Ao salvar Itens/Skills, o painel grava o cru do server E o arquivo v4 cifrado do client.
+   - Deixe `ClientUIDir`/`ClientGameDir` **vazios** (`""`) para desativar o sync do client.
    - `Host` / `Port` — onde o painel escuta. `127.0.0.1` = só esta máquina.
    - `Password` — senha de administrador exigida na tela de login. **Troque sempre.**
 
@@ -105,6 +109,33 @@ re-serializa e confere byte a byte. Deve imprimir `ROUND-TRIP OK 6000/6000`.
   IconID→(atlas,célula) **não** é o mapeamento sequencial simples (`atlas=IconID/1024`) —
   a verificação falhou; a lógica de seleção do atlas está no `AIKA.exe` (sem fonte) e
   precisa de mais engenharia reversa. Por isso o thumbnail por item **não** foi embutido.
+
+### Skills (`SkillData.bin`)
+- Registro **packed** de **720 bytes** (`T_SkillData` em `Src\Data\FilesData.pas`), 12000 registros + 4
+  de trailer. ID = índice no array. Win-1252; Nome(PT)@84, Nome(EN)@20, Descrição@428.
+- Editáveis: Nome PT/EN, Descrição, Level, MinLevel, Classe, Classification, SkillPoints, LearnCosts,
+  MP, Damage, Range, SuccessRate, MaxTargets, Cooldown, CastTime, Duration, TargetType.
+- **Prova:** `--selftest` → `SkillData.bin ROUND-TRIP OK 12000/12000`.
+
+### Sincronização do client v4 (`ItemList4.bin` / `SkillData4.bin`)
+- O **server** lê o cru (`Data\ItemList.bin`, `Data\SkillData.bin`); o **client** lê versões CIFRADAS
+  (`ItemList4.bin`, `SkillData4.bin` na raiz do client). Editar só o cru não muda o que o client mostra.
+- **Esquema v4 (engenharia reversa, provado byte-a-byte):** cada arquivo do client =
+  **header de 12 bytes em texto** (`"BR00022I"` no ItemList, `"BR00010S"` no SkillData) **+** corpo
+  cifrado com a cifra posicional do MasterEditor, mas com o `j` **reiniciando em 0 no início do corpo**
+  (após o header). ItemList usa **Key1**, SkillData usa **Key2**.
+  - `enc[j] = (raw[j] + tabela[j mod len] + j) mod 256` sobre o corpo (cru = arquivo inteiro do server).
+  - Prova: `encrypt(decrypt(corpo)) == corpo` byte-idêntico nos dois; e `decrypt(SkillData4) == Data\SkillData.bin`
+    100% (zero drift). Nomes decifrados legíveis ("Pedra da Pran", "Ataque Poderoso", "Revitalizar").
+- Ao salvar um Item/Skill, o painel grava o cru do server E reescreve o arquivo v4 do client =
+  **header existente preservado + Encrypt(cru do server)** (backup do arquivo do client antes).
+- **Badge de sync** em cada aba + botão **Sincronizar client**. O ItemList do client costuma começar
+  defasado (snapshot mais antigo) → badge vermelho até o 1º sync; depois fica verde. O SkillData já
+  vinha idêntico ao server (verde de cara).
+- **Atenção:** sincronizar **sobrescreve o catálogo do client com o do server** (o client passa a
+  espelhar o server). Itens ficam no mesmo índice — é atualização de valores, não embaralha.
+- CLI de RE/prova: `tools\v4crack` (decifra um arquivo v4, mostra o Name de um registro e prova o
+  round-trip): `dotnet run -- <ItemList4.bin> key1 12 464 100 0 64 [Data\ItemList.bin]`.
 
 ### Quests (`Quests.csv`)
 - O servidor lê `Data\Quest\Quests.csv` **diretamente no boot** (`InitQuests` em `Load.pas`)

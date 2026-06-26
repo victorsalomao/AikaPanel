@@ -26,6 +26,12 @@ Edits two data files with BYTE-EXACT output the server already expects. Friendly
 - REQ-10 Cash sync client: ao salvar Loja de Cash, gravar `Data\PI.bin` (cru) E `ClientUIDir\PI.bin` (cifrado Key1),
   com backup do client. Cifra replica MasterEditor SaveEncriptedFileKey1: enc[j]=(raw[j]+cipher[j%102]+j)%256.
   PROVA: encrypt(decrypt(UI))==UI 2256004/2256004 byte-idêntico; decrypt(UI) legível. Badge de sync + botão Sincronizar.
+- REQ-11 Skills server-side: editar `Data\SkillData.bin` (12000 × 720 packed T_SkillData, +4 trailer). Tabela
+  buscável, edição (Nome/Desc/Level/MP/Damage/Cooldown/...), backup, round-trip self-test 12000/12000.
+- REQ-12 v4 client-sync (RE provada): ItemList4.bin/SkillData4.bin = header[12] texto ("BR00022I"/"BR00010S")
+  + corpo cifrado (j reinicia em 0 no corpo); ItemList=Key1, SkillData=Key2. PROVA: round-trip byte-idêntico nos 2;
+  decrypt(SkillData4)==Data\SkillData.bin 8640004/8640004; nomes legíveis. Sync no save (push: header+Encrypt(cru)),
+  backup do client, badge+botão. ItemList tem drift (snapshots) → push alinha; SkillData zero-drift.
 
 ## Quest pipeline finding (CRITICAL — verified)
 Load.pas `InitQuests` (L863) reads `Quests.csv` DIRECTLY into `_Quests` at boot and assigns to NPCs (L1834).
