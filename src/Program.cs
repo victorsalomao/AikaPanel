@@ -638,6 +638,30 @@ app.MapPost("/api/characters/{id:int}/items", (uint id, ItemUpsert u) =>
     catch (Exception ex) { return Results.Json(Err("ERRO_GRAVACAO", ex.Message), statusCode: 400); }
 });
 
+app.MapGet("/api/characters/{id:int}/titles", (uint id) =>
+{
+    try
+    {
+        var rows = accounts.GetTitles(id);
+        var names = titlesRepo.Exists
+            ? titlesRepo.DecodeAll().ToDictionary(t => t.Index, t => t.Name)
+            : new Dictionary<int, string>();
+        foreach (var r in rows) r.Name = names.TryGetValue((int)r.Index, out var n) ? n : "";
+        return Results.Json(Ok(new { itens = rows }));
+    }
+    catch (Exception ex) { return Results.Json(Err("ERRO_DB", ex.Message), statusCode: 400); }
+});
+
+app.MapPost("/api/characters/{id:int}/titles", (uint id, List<TitleAssign> body) =>
+{
+    try
+    {
+        var bak = accounts.SaveTitles(id, body);
+        return Results.Json(Ok(new { backup = bak }, "Titulos do personagem salvos. (edite com o char OFFLINE)"));
+    }
+    catch (Exception ex) { return Results.Json(Err("ERRO_GRAVACAO", ex.Message), statusCode: 400); }
+});
+
 // --- Itens de Evento (tecla T) ----------------------------------------------
 // Entrega item via slot_type=17 (EVENT_ITEM): fica guardado ate o player apertar T.
 app.MapPost("/api/eventitem", (EventItemDto dto) =>
