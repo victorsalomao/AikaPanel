@@ -449,6 +449,17 @@ app.MapGet("/api/titles/selftest", () =>
 
 app.MapGet("/api/titles/ef-names", () => Results.Json(Ok(EfNames.Map)));
 
+app.MapPost("/api/titles/{index:int}", (int index, List<TitleLevelData> levels) =>
+{
+    if (!titlesRepo.Exists) return Results.Json(Err("ARQUIVO_NAO_ENCONTRADO", "Title.bin nao encontrado."), statusCode: 404);
+    try
+    {
+        var bak = titlesRepo.Update(index, levels);
+        return Results.Json(Ok(new { backup = bak }, "Titulo salvo no Title.bin. Reinicie o server para aplicar."));
+    }
+    catch (Exception ex) { return Results.Json(Err("ERRO_GRAVACAO", ex.Message), statusCode: 400); }
+});
+
 // --- NPCs (Data\NPCs\*.npc) -------------------------------------------------
 app.MapGet("/api/npcs", (string? q) =>
 {
