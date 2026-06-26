@@ -937,7 +937,7 @@ function renderTitlesTable() {
   let shown = 0;
   for (const t of rows) {
     if (t.index === 0 && !t.name) continue;
-    if (q && !(t.name.toLowerCase().includes(q) || String(t.index) === q)) continue;
+    if (q && !((t.name || "").toLowerCase().includes(q) || String(t.index) === q)) continue;
     shown++;
     const tr = document.createElement("tr");
     tr.innerHTML =
@@ -956,7 +956,7 @@ function renderTitlesTable() {
 function efSelectHtml(selected) {
   const codes = EF_NAMES ? Object.keys(EF_NAMES).map(Number).sort((a, b) => a - b) : [0];
   let html = "";
-  for (const c of codes) html += `<option value="${c}"${c === selected ? " selected" : ""}>${esc(EF_NAMES[c])} (${c})</option>`;
+  for (const c of codes) html += `<option value="${c}"${c === selected ? " selected" : ""}>${esc(EF_NAMES ? EF_NAMES[c] : String(c))} (${c})</option>`;
   return html;
 }
 
@@ -1019,10 +1019,10 @@ async function saveTitleEdit() {
   });
   const { body } = await api(`/api/titles/${titleEditIndex}`, { method: "POST", body: JSON.stringify(levels) });
   if (!body.sucesso) { $("modalTitleErro").textContent = body.mensagem; return; }
-  showMsg("tituloSelftest", `Salvo. Backup: ${body.dados.backup}.`, false);
   $("modalTitle").classList.add("hidden");
   ALL_TITLES = null;            // invalida cache p/ refletir mudanças
   await loadTitlesTab();
+  showMsg("tituloSelftest", `Salvo. Backup: ${body.dados.backup}.`, false);
 }
 
 /* ---------- ÍCONES ---------- */
