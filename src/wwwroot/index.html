@@ -27,7 +27,11 @@
       <button class="tab ativo" data-tab="cash">Cash Shop</button>
       <button class="tab" data-tab="itens">Itens</button>
       <button class="tab" data-tab="skills">Skills</button>
+      <button class="tab" data-tab="npcs">NPCs</button>
+      <button class="tab" data-tab="contas">Contas</button>
+      <button class="tab" data-tab="evento">Itens Evento (T)</button>
       <button class="tab" data-tab="quests">Quests</button>
+      <button class="tab" data-tab="icones">Ícones</button>
     </nav>
     <button id="btnSair" class="ghost">Sair</button>
   </header>
@@ -66,7 +70,10 @@
   <section id="tab-itens" class="tab-pane hidden">
     <div class="toolbar">
       <input id="buscaItem" placeholder="Buscar por ID, Nome (PT) ou Nome (EN)..." />
+      <input id="itemMinLevel" type="number" min="0" placeholder="Level min" style="max-width:110px" />
+      <input id="itemMaxLevel" type="number" min="0" placeholder="Level max" style="max-width:110px" />
       <button id="btnBuscarItem">Buscar</button>
+      <button id="btnLimparItem" class="ghost">Limpar</button>
       <span id="itemStats" class="stats"></span>
     </div>
     <div class="sync-bar">
@@ -78,7 +85,7 @@
     <div class="tabela-wrap">
       <table id="tblItens">
         <thead><tr>
-          <th>ID</th><th>Nome (PT)</th><th>Nome (EN)</th><th>Tipo</th>
+          <th>Ícone</th><th>ID</th><th>Nome (PT)</th><th>Nome (EN)</th><th>Tipo</th>
           <th>Level</th><th>Preço (gold)</th><th>IconID</th><th></th>
         </tr></thead>
         <tbody></tbody>
@@ -120,6 +127,103 @@
     </div>
   </section>
 
+  <!-- NPCs -->
+  <section id="tab-npcs" class="tab-pane hidden">
+    <div class="toolbar">
+      <input id="buscaNpc" placeholder="Buscar por ID, nome ou título..." />
+      <button id="btnBuscarNpc">Buscar</button>
+      <button id="btnNovoNpc" class="primary">+ Novo NPC</button>
+      <span id="npcStats" class="stats"></span>
+    </div>
+    <div class="sync-bar">
+      <span id="npcSelftest" class="sync-badge">verificando…</span>
+      <span class="muted">edita <code>Data\NPCs\*.npc</code> (loja = inventário do NPC, slots 0–39 · posição = coordenada). Reinicie o servidor para aplicar.</span>
+    </div>
+    <div id="npcMsg" class="msg"></div>
+    <div class="tabela-wrap">
+      <table id="tblNpcs">
+        <thead><tr>
+          <th>ID</th><th>Nome (arquivo)</th><th>Título</th><th title="Nome que aparece no jogo (name-id). NPCs com o mesmo nome in-game aparecem iguais para o jogador.">Nome in-game</th><th>Posição (X, Y)</th><th>Itens na loja</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CONTAS -->
+  <section id="tab-contas" class="tab-pane hidden">
+    <div class="toolbar">
+      <input id="buscaConta" placeholder="Buscar por ID, usuário ou e-mail..." />
+      <button id="btnBuscarConta">Buscar</button>
+      <button id="btnNovaConta" class="primary">+ Nova conta</button>
+      <span id="contaStats" class="stats"></span>
+    </div>
+    <div class="sync-bar">
+      <span id="dbBadge" class="sync-badge">verificando…</span>
+      <span class="muted">banco <code>caelite</code> (MySQL). ⚠ edite personagens com o char <b>offline</b> — o server sobrescreve o DB ao deslogar.</span>
+    </div>
+    <div id="contaMsg" class="msg"></div>
+    <div class="tabela-wrap">
+      <table id="tblContas">
+        <thead><tr>
+          <th>ID</th><th>Usuário</th><th>E-mail</th><th>Tipo</th><th>Nação</th><th>Cash</th><th>Personagens</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <button id="contaPrev">&laquo; Anterior</button>
+      <span id="contaPag"></span>
+      <button id="contaNext">Próxima &raquo;</button>
+    </div>
+  </section>
+
+  <!-- ITENS DE EVENTO (tecla T) -->
+  <section id="tab-evento" class="tab-pane hidden">
+    <div class="sync-bar">
+      <span id="evtDbBadge" class="sync-badge">verificando…</span>
+      <span class="muted">entrega item via <code>slot_type=17</code> no banco <code>caelite</code>. O item fica guardado até o jogador apertar <b>T</b> no jogo. Funciona com o char online ou offline.</span>
+    </div>
+    <div class="char-cols">
+      <div class="char-form">
+        <fieldset class="grupo"><legend>1 — Escolher item</legend>
+          <div class="toolbar" style="margin-bottom:8px">
+            <input id="evtBuscaItem" placeholder="Buscar item por nome ou ID..." />
+            <button id="evtBtnBuscar" class="primary">Buscar</button>
+          </div>
+          <div class="tabela-wrap" style="max-height:260px">
+            <table id="evtTblItens">
+              <thead><tr><th>Ícone</th><th>ID</th><th>Nome (PT)</th><th>Nome (EN)</th><th>Level</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </fieldset>
+
+        <fieldset class="grupo"><legend>2 — Item selecionado</legend>
+          <div class="campo-linha">
+            <div class="campo"><label>ID do item</label><input id="evtItemId" type="number" min="1" /></div>
+            <div class="campo" style="flex:2"><label>Nome</label><input id="evtItemNome" disabled /></div>
+            <div class="campo"><label>Quantidade</label><input id="evtQtd" type="number" min="1" value="1" /></div>
+          </div>
+          <p class="muted" style="margin-top:2px">A quantidade vai no campo <code>refine</code>. Itens <b>não-empilháveis</b> (alguns baús): use qtde 1 ou envie várias vezes.</p>
+        </fieldset>
+
+        <fieldset class="grupo"><legend>3 — Quem recebe</legend>
+          <div class="campo-linha">
+            <div class="campo" style="flex:2"><label>Nome do personagem</label><input id="evtTarget" placeholder="ex: Heroizinho" maxlength="16" /></div>
+            <div class="campo"><label>&nbsp;</label>
+              <label class="chk"><input type="checkbox" id="evtTodos" /> Todos os personagens</label>
+            </div>
+          </div>
+          <div id="evtMsg" class="msg"></div>
+          <div class="modal-acoes" style="justify-content:flex-start">
+            <button id="evtEnviar" class="primary">Enviar item de evento</button>
+          </div>
+        </fieldset>
+      </div>
+    </div>
+  </section>
+
   <!-- QUESTS -->
   <section id="tab-quests" class="tab-pane hidden">
     <div class="toolbar">
@@ -133,6 +237,55 @@
       <table id="tblQuests"><thead><tr></tr></thead><tbody></tbody></table>
     </div>
   </section>
+
+  <!-- ÍCONES -->
+  <section id="tab-icones" class="tab-pane hidden">
+    <div class="toolbar">
+      <label>Atlas:
+        <select id="iconAtlasSel"></select>
+      </label>
+      <span class="muted">Clique numa célula para ver/editar o vínculo <code>IconID → ícone</code>. Os ícones reais vêm de <code>UI\ItemIcons NN.jit</code> do client.</span>
+      <span id="iconStats" class="stats"></span>
+    </div>
+    <div id="iconMsg" class="msg"></div>
+    <div class="icone-browser">
+      <div class="icone-sheet-wrap" id="iconSheetWrap">
+        <img id="iconSheet" alt="atlas" draggable="false" />
+        <div id="iconHi" class="icone-hi hidden"></div>
+      </div>
+      <div class="icone-side">
+        <h3>Célula selecionada</h3>
+        <div id="iconSelInfo" class="muted">Nenhuma célula selecionada.</div>
+        <div class="campo"><label>IconID vinculado a esta célula</label>
+          <input id="iconLinkId" type="number" min="0" max="65535" placeholder="ex: 4113" />
+        </div>
+        <div class="modal-acoes" style="justify-content:flex-start">
+          <button id="iconLinkSave" class="primary">Vincular</button>
+          <button id="iconLinkDel" class="ghost">Remover vínculo</button>
+        </div>
+        <p class="muted" style="margin-top:14px">Dica: digite um IconID na busca de Itens, anote a célula correspondente aqui e vincule — assim o painel passa a mostrar o ícone real desse item.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- OVERLAY PICKER (escolher ícone para um item) -->
+<div id="iconPicker" class="modal hidden">
+  <div class="modal-box modal-box-lg">
+    <h2>Escolher ícone do jogo — <span id="pickFor"></span></h2>
+    <div class="toolbar">
+      <label>Atlas: <select id="pickAtlasSel"></select></label>
+      <span class="muted">Clique no ícone desejado. Só células já vinculadas a um IconID podem ser aplicadas ao item.</span>
+    </div>
+    <div id="pickMsg" class="msg"></div>
+    <div class="icone-sheet-wrap pick" id="pickSheetWrap">
+      <img id="pickSheet" alt="atlas" draggable="false" />
+      <div id="pickHi" class="icone-hi hidden"></div>
+    </div>
+    <div class="modal-acoes">
+      <button id="pickCancelar" class="ghost">Fechar</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL EDIT CASH -->
@@ -175,6 +328,12 @@
       <div class="campo"><label>UseEffect</label><input id="iUseEffect" type="number" min="0" max="65535" /></div>
       <div class="campo"><label>Level</label><input id="iLevel" type="number" min="0" max="65535" /></div>
       <div class="campo"><label>IconID</label><input id="iIconID" type="number" min="0" max="65535" /></div>
+      <div class="campo"><label>Ícone do jogo</label>
+        <div class="icone-preview-linha">
+          <span id="iIconePreview" class="icon icon-lg" title="Ícone atual"></span>
+          <button type="button" id="iEscolherIcone" class="ghost">Escolher do jogo…</button>
+        </div>
+      </div>
     </div>
     <div class="campo-linha">
       <div class="campo"><label>Classe</label><input id="iClasse" type="number" min="0" max="65535" /></div>
@@ -251,6 +410,257 @@
     <div class="modal-acoes">
       <button id="sCancelar" class="ghost">Cancelar</button>
       <button id="sSalvar" class="primary">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT NPC -->
+<div id="modalNpc" class="modal hidden">
+  <div class="modal-box modal-box-lg">
+    <h2>Editar NPC — <span id="nTitulo"></span></h2>
+    <div id="nHardcoded" class="aviso hidden"></div>
+    <div id="nTwins" class="aviso hidden"></div>
+    <div class="campo-linha">
+      <div class="campo"><label>Título (máx 35)</label><input id="nTitle" maxlength="35" /></div>
+      <div class="campo"><label>Posição X</label><input id="nX" type="number" step="0.1" /></div>
+      <div class="campo"><label>Posição Y</label><input id="nY" type="number" step="0.1" /></div>
+    </div>
+    <div class="campo-linha">
+      <div class="campo"><label>Mover para cidade/região</label>
+        <select id="nCidade"><option value="">— escolher —</option></select>
+      </div>
+      <div class="campo"><label>Colar perto de outro NPC</label>
+        <select id="nPertoDe"><option value="">— escolher NPC —</option></select>
+      </div>
+      <div class="campo" style="flex:0 0 auto;align-self:flex-end">
+        <button id="nFreeSpot" class="ghost" title="Ajusta X/Y para não ficar em cima de outro NPC">Achar lugar livre</button>
+      </div>
+    </div>
+
+    <fieldset class="grupo"><legend>Loja (inventário do NPC — slots 0–63; só 0–39 aparecem in-game)</legend>
+      <div class="toolbar" style="margin-bottom:8px">
+        <input id="nAddItemId" type="number" min="1" placeholder="ID do item" style="max-width:120px" />
+        <button id="nAddItem" class="primary">+ Adicionar à loja</button>
+        <span class="muted">no primeiro slot livre. O preço vem do <code>SellPrince</code> do item (editável abaixo).</span>
+      </div>
+      <div class="tabela-wrap" style="max-height:320px">
+        <table id="tblNpcShop">
+          <thead><tr><th>Slot</th><th>ID</th><th>Item</th><th>Preço (gold)</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </fieldset>
+    <div id="modalNpcErro" class="erro"></div>
+    <div class="modal-acoes">
+      <button id="nExcluir" class="ghost danger">Excluir NPC</button>
+      <span style="flex:1"></span>
+      <button id="nCancelar" class="ghost">Cancelar</button>
+      <button id="nSalvar" class="primary">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CREATE NPC -->
+<div id="modalNpcNovo" class="modal hidden">
+  <div class="modal-box">
+    <h2>Novo NPC (clonar)</h2>
+    <div class="campo"><label>Clonar a partir do NPC</label>
+      <select id="cSource"><option value="">— escolher NPC base —</option></select>
+      <span class="muted">copia aparência, classe e a loja do NPC base.</span>
+    </div>
+    <div class="campo-linha">
+      <div class="campo"><label>Novo ID</label><input id="cId" type="number" min="2048" max="3047" /></div>
+      <div class="campo"><label>Nome</label><input id="cNome" maxlength="40" /></div>
+    </div>
+    <div class="campo"><label>Título (opcional)</label><input id="cTitle" maxlength="35" /></div>
+    <div class="campo-linha">
+      <div class="campo"><label>Cidade/região</label><select id="cCidade"><option value="">— escolher —</option></select></div>
+      <div class="campo"><label>X</label><input id="cX" type="number" step="0.1" /></div>
+      <div class="campo"><label>Y</label><input id="cY" type="number" step="0.1" /></div>
+    </div>
+    <div id="modalNpcNovoErro" class="erro"></div>
+    <div class="modal-acoes">
+      <button id="cCancelar" class="ghost">Cancelar</button>
+      <button id="cCriar" class="primary">Criar NPC</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT ACCOUNT -->
+<div id="modalConta" class="modal hidden">
+  <div class="modal-box modal-box-lg">
+    <h2>Editar conta — <span id="aTitulo"></span></h2>
+    <div class="campo-linha">
+      <div class="campo"><label>Usuário</label><input id="aUser" maxlength="16" /></div>
+      <div class="campo"><label>E-mail</label><input id="aMail" maxlength="254" /></div>
+      <div class="campo"><label>Nação</label><select id="aNation"><option value="1">Elsinore</option><option value="2">Odeon</option><option value="3">Tibérica</option></select></div>
+    </div>
+    <div class="campo-linha">
+      <div class="campo"><label>account_type (5 = GM/admin)</label><input id="aType" type="number" min="0" /></div>
+      <div class="campo"><label>account_status</label><input id="aStatus" type="number" min="0" /></div>
+      <div class="campo"><label>isactive</label><input id="aActive" maxlength="50" /></div>
+      <div class="campo"><label>ban_days</label><input id="aBan" type="number" min="0" /></div>
+    </div>
+    <div class="campo-linha">
+      <div class="campo"><label>Cash</label><input id="aCash" type="number" /></div>
+      <div class="campo"><label>storage_gold</label><input id="aStorage" type="number" /></div>
+      <div class="campo"><label>premium_time</label><input id="aPremium" maxlength="50" /></div>
+      <div class="campo"><label>Discord</label><input id="aDiscord" maxlength="100" /></div>
+    </div>
+    <fieldset class="grupo"><legend>Redefinir senha (opcional)</legend>
+      <div class="campo"><label>Nova senha (grava como MD5; deixe vazio para não mudar)</label><input id="aNewPass" /></div>
+    </fieldset>
+    <fieldset class="grupo"><legend>Personagens</legend>
+      <div class="tabela-wrap" style="max-height:200px">
+        <table id="tblAccChars"><thead><tr><th>ID</th><th>Nome</th><th>Slot</th><th>Level</th><th>Classe</th><th>Gold</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+    </fieldset>
+    <div id="modalContaErro" class="erro"></div>
+    <div class="modal-acoes">
+      <button id="aCancelar" class="ghost">Cancelar</button>
+      <button id="aSalvar" class="primary">Salvar conta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NEW ACCOUNT -->
+<div id="modalContaNova" class="modal hidden">
+  <div class="modal-box">
+    <h2>Nova conta</h2>
+    <div class="campo-linha">
+      <div class="campo"><label>Usuário</label><input id="ncUser" maxlength="16" /></div>
+      <div class="campo"><label>Senha</label><input id="ncPass" /></div>
+    </div>
+    <div class="campo-linha">
+      <div class="campo"><label>E-mail</label><input id="ncMail" maxlength="254" /></div>
+      <div class="campo"><label>Nação</label><select id="ncNation"><option value="1">Elsinore</option><option value="2">Odeon</option><option value="3">Tibérica</option></select></div>
+    </div>
+    <div class="campo-linha">
+      <div class="campo"><label>account_type</label><input id="ncType" type="number" min="0" value="0" /></div>
+      <div class="campo"><label>Cash</label><input id="ncCash" type="number" value="0" /></div>
+    </div>
+    <div id="modalContaNovaErro" class="erro"></div>
+    <div class="modal-acoes">
+      <button id="ncCancelar" class="ghost">Cancelar</button>
+      <button id="ncCriar" class="primary">Criar conta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT CHARACTER -->
+<div id="modalChar" class="modal hidden">
+  <div class="modal-box modal-box-xl">
+    <h2>Editar personagem — <span id="chTitulo"></span></h2>
+    <div class="aviso">⚠ Edite com o personagem <b>offline</b>. O servidor mantém o char logado em memória e sobrescreve o banco ao deslogar/salvar. Reinicie/relogue para ver as mudanças.</div>
+    <div class="char-cols">
+      <div class="char-form">
+        <fieldset class="grupo"><legend>Identidade</legend>
+          <div class="campo-linha">
+            <div class="campo"><label>Nome</label><input id="chName" maxlength="16" /></div>
+            <div class="campo"><label>Slot</label><input id="chSlot" type="number" min="0" max="2" /></div>
+            <div class="campo"><label>Level</label><input id="chLevel" type="number" min="1" /></div>
+            <div class="campo"><label>Classe</label><input id="chClass" type="number" min="0" /></div>
+          </div>
+          <div class="campo-linha">
+            <div class="campo"><label>Experiência</label><input id="chExp" type="number" min="0" /></div>
+            <div class="campo"><label>Título ativo</label><select id="chTitle"></select></div>
+            <div class="campo"><label>PK</label><select id="chPk"><option value="0">não</option><option value="1">sim</option></select></div>
+            <div class="campo"><label>deleted</label><select id="chDeleted"><option value="0">não</option><option value="1">sim</option></select></div>
+          </div>
+        </fieldset>
+        <fieldset class="grupo"><legend>Atributos</legend>
+          <div class="campo-linha">
+            <div class="campo"><label>Força</label><input id="chStr" type="number" min="0" /></div>
+            <div class="campo"><label>Agilidade</label><input id="chAgi" type="number" min="0" /></div>
+            <div class="campo"><label>Intel.</label><input id="chInt" type="number" min="0" /></div>
+            <div class="campo"><label>Const.</label><input id="chCon" type="number" min="0" /></div>
+            <div class="campo"><label>Sorte</label><input id="chLuck" type="number" min="0" /></div>
+            <div class="campo"><label>status (livres)</label><input id="chStatus" type="number" min="0" /></div>
+          </div>
+        </fieldset>
+        <fieldset class="grupo"><legend>Recursos / Posição</legend>
+          <div class="campo-linha">
+            <div class="campo"><label>Gold</label><input id="chGold" type="number" min="0" /></div>
+            <div class="campo"><label>CurHP</label><input id="chHp" type="number" min="0" /></div>
+            <div class="campo"><label>CurMP</label><input id="chMp" type="number" min="0" /></div>
+            <div class="campo"><label>Honra</label><input id="chHonor" type="number" min="0" /></div>
+          </div>
+          <div class="campo-linha">
+            <div class="campo"><label>KillPoint</label><input id="chKill" type="number" min="0" /></div>
+            <div class="campo"><label>SkillPoint</label><input id="chSkill" type="number" min="0" /></div>
+            <div class="campo"><label>Guild</label><input id="chGuild" type="number" min="0" /></div>
+          </div>
+          <div class="campo-linha">
+            <div class="campo"><label>PosX</label><input id="chPosx" type="number" min="0" /></div>
+            <div class="campo"><label>PosY</label><input id="chPosy" type="number" min="0" /></div>
+            <div class="campo"><label>Altura</label><input id="chAltura" type="number" min="0" /></div>
+            <div class="campo"><label>Tronco</label><input id="chTronco" type="number" min="0" /></div>
+            <div class="campo"><label>Perna</label><input id="chPerna" type="number" min="0" /></div>
+            <div class="campo"><label>Corpo</label><input id="chCorpo" type="number" min="0" /></div>
+          </div>
+        </fieldset>
+      </div>
+      <div class="char-side">
+        <fieldset class="grupo"><legend>Equipamento</legend>
+          <div id="paperDoll" class="paper-doll"></div>
+        </fieldset>
+      </div>
+    </div>
+    <fieldset class="grupo"><legend>Inventário / Armazém</legend>
+      <div class="inv-tabs">
+        <button class="inv-tab ativo" data-inv="1">Inventário</button>
+        <button class="inv-tab" data-inv="2">Armazém</button>
+      </div>
+      <div id="invGrid" class="inv-grid"></div>
+    </fieldset>
+    <fieldset class="grupo"><legend>Títulos</legend>
+      <div class="muted" style="margin-bottom:6px">Títulos dão atributos diretos. Conceda um título, ajuste nível/progresso e escolha o título ativo. Salve com o char <b>offline</b>.</div>
+      <div class="campo-linha">
+        <div class="campo" style="flex:3"><label>Conceder título</label><select id="chTitleAdd"></select></div>
+        <div class="campo"><label>&nbsp;</label><button id="chTitleAddBtn" type="button" class="primary">+ Conceder</button></div>
+      </div>
+      <div class="tabela-wrap" style="max-height:200px">
+        <table id="tblCharTitles">
+          <thead><tr><th>#</th><th>Nome</th><th>Atributos (nível atual)</th><th>Nível</th><th>Progresso</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="modal-acoes" style="margin-top:8px">
+        <button id="chTitlesSalvar" type="button" class="primary">Salvar títulos</button>
+      </div>
+    </fieldset>
+    <div id="modalCharErro" class="erro"></div>
+    <div class="modal-acoes">
+      <button id="chCancelar" class="ghost">Fechar</button>
+      <button id="chSalvar" class="primary">Salvar personagem</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT ITEM (slot de char) -->
+<div id="modalCharItem" class="modal hidden">
+  <div class="modal-box">
+    <h2>Item — <span id="ciLoc"></span></h2>
+    <div class="campo-linha">
+      <div class="campo"><label>ID do item (0 = limpar slot)</label><input id="ciItemId" type="number" min="0" /></div>
+      <div class="campo"><label>APP (0 = próprio)</label><input id="ciApp" type="number" min="0" /></div>
+      <div class="campo"><label>Refino</label><input id="ciRefine" type="number" min="0" /></div>
+    </div>
+    <div id="ciName" class="muted"></div>
+    <div class="campo-linha">
+      <div class="campo"><label>Efeito 1 (idx / val)</label><div style="display:flex;gap:4px"><input id="ciE1i" type="number" min="0" /><input id="ciE1v" type="number" min="0" /></div></div>
+      <div class="campo"><label>Efeito 2 (idx / val)</label><div style="display:flex;gap:4px"><input id="ciE2i" type="number" min="0" /><input id="ciE2v" type="number" min="0" /></div></div>
+      <div class="campo"><label>Efeito 3 (idx / val)</label><div style="display:flex;gap:4px"><input id="ciE3i" type="number" min="0" /><input id="ciE3v" type="number" min="0" /></div></div>
+    </div>
+    <div class="campo-linha">
+      <div class="campo"><label>Min</label><input id="ciMin" type="number" min="0" /></div>
+      <div class="campo"><label>Max</label><input id="ciMax" type="number" min="0" /></div>
+      <div class="campo"><label>Tempo</label><input id="ciTime" type="number" min="0" /></div>
+    </div>
+    <div id="modalCharItemErro" class="erro"></div>
+    <div class="modal-acoes">
+      <button id="ciCancelar" class="ghost">Cancelar</button>
+      <button id="ciSalvar" class="primary">Salvar item</button>
     </div>
   </div>
 </div>
