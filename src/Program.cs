@@ -447,6 +447,8 @@ app.MapGet("/api/titles/selftest", () =>
     catch (Exception ex) { return Results.Json(Err("ERRO", ex.Message), statusCode: 400); }
 });
 
+app.MapGet("/api/titles/ef-names", () => Results.Json(Ok(EfNames.Map)));
+
 // --- NPCs (Data\NPCs\*.npc) -------------------------------------------------
 app.MapGet("/api/npcs", (string? q) =>
 {
